@@ -232,21 +232,17 @@ void FASTCALL movement::Detour_TryPlayerMove(CCSPlayer_MovementServices *ms, CMo
 
 void FASTCALL movement::Detour_ClipVelocity(CCSPlayer_MovementServices *ms, Vector &in, Vector &normal, Vector &out, f32 overbounce)
 {
-	//ClipVelocity(ms, in, normal, out, overbounce);
-	float	backoff;
-	float	change;
-	
 	// Determine how far along plane to slide based on incoming direction.
-	backoff = DotProduct(in, normal) * overbounce;
+	f32 backoff = DotProduct(in, normal) * overbounce;
 	
 	for (i32 i = 0; i < 3; i++)
 	{
-		change = normal[i] * backoff;
+		f32 change = normal[i] * backoff;
 		out[i] = in[i] - change; 
 	}
 	
 	// Rampbug/wallbug fix: always move a little bit away from the plane
-	float adjust = -0.25f;
+	float adjust = -0.5f;
 	out -= (normal * adjust);
 }
 
