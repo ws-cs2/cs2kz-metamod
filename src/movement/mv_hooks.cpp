@@ -23,6 +23,7 @@ void movement::InitDetours()
 	INIT_DETOUR(Friction);
 	INIT_DETOUR(WalkMove);
 	INIT_DETOUR(TryPlayerMove);
+	INIT_DETOUR(ClipVelocity);
 	INIT_DETOUR(CategorizePosition);
 	INIT_DETOUR(FinishGravity);
 	INIT_DETOUR(CheckFalling);
@@ -227,6 +228,26 @@ void FASTCALL movement::Detour_TryPlayerMove(CCSPlayer_MovementServices *ms, CMo
 	player->OnTryPlayerMove(pFirstDest, pFirstTrace);
 	TryPlayerMove(ms, mv, pFirstDest, pFirstTrace);
 	player->OnTryPlayerMovePost(pFirstDest, pFirstTrace);
+}
+
+void FASTCALL movement::Detour_ClipVelocity(CCSPlayer_MovementServices *ms, Vector &in, Vector &normal, Vector &out, f32 overbounce)
+{
+	//ClipVelocity(ms, in, normal, out, overbounce);
+	float	backoff;
+	float	change;
+	
+	// Determine how far along plane to slide based on incoming direction.
+	backoff = DotProduct(in, normal) * overbounce;
+	
+	for (i32 i = 0; i < 3; i++)
+	{
+		change = normal[i] * backoff;
+		out[i] = in[i] - change; 
+	}
+	
+	// Rampbug/wallbug fix: always move a little bit away from the plane
+	float adjust = -0.25f;
+	out -= (normal * adjust);
 }
 
 void FASTCALL movement::Detour_CategorizePosition(CCSPlayer_MovementServices *ms, CMoveData *mv, bool bStayOnGround)
