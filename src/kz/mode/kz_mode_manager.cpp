@@ -90,6 +90,13 @@ void KZ::mode::ApplyModeCvarValues(KZPlayer *player)
 {
 	for (u32 i = 0; i < numCvar; i++)
 	{
+		// TODO: CVAR creation waiting room
+		// HACK HACK
+		if (i == 0)
+		{
+			// mv_rampbug_fix
+			continue;
+		}
 		u8 byteArray[16] = {};
 		if (modeCvars[i]->m_eVarType == EConVarType_Float32)
 		{

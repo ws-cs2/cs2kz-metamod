@@ -1,6 +1,12 @@
 #include "movement.h"
 #include "utils/detours.h"
 
+// TODO: CVAR creation waiting room
+// HACK HACK
+// kz stuff shouldn't even be used in here!
+#include "kz/kz.h"
+#include "kz/mode/kz_mode.h"
+
 #include "tier0/memdbgon.h"
 
 void movement::InitDetours()
@@ -232,6 +238,16 @@ void FASTCALL movement::Detour_TryPlayerMove(CCSPlayer_MovementServices *ms, CMo
 
 void FASTCALL movement::Detour_ClipVelocity(CCSPlayer_MovementServices *ms, Vector &in, Vector &normal, Vector &out, f32 overbounce)
 {
+	// TODO: CVAR creation waiting room
+	// HACK HACK
+	// kz stuff shouldn't even be used in here!
+	KZPlayer *player = g_pKZPlayerManager->ToPlayer(ms);
+	const char *mv_rampbug_fixValue = player->modeService->GetModeConVarValues()[0];
+	if (mv_rampbug_fixValue[0] == '0')
+	{
+		ClipVelocity(ms, in, normal, out, overbounce);
+		return;
+	}
 	// Determine how far along plane to slide based on incoming direction.
 	f32 backoff = DotProduct(in, normal) * overbounce;
 	

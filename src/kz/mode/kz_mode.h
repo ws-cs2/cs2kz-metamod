@@ -108,6 +108,8 @@ namespace KZ::mode
 
 	inline const char *modeCvarNames[] =
 	{
+		// HACK HACK TODO: CVAR creation waiting room
+		"sv_vote_timer_duration", // mv_rampbug_fix. set to sv_vote_timer_duration temporarily to simplify the hack, cvar won't be changed.
 		"slope_drop_enable",
 		"sv_accelerate",
 		"sv_accelerate_use_weapon_speed",

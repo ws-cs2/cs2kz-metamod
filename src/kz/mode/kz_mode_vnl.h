@@ -18,6 +18,7 @@ class KZVanillaModeService : public KZModeService
 
 	const char *modeCvarValues[KZ::mode::numCvar] =
 	{
+		"0",				// mv_rampbug_fix
 		"true",				// slope_drop_enable
 		"5.5",				// sv_accelerate
 		"true",				// sv_accelerate_use_weapon_speed
