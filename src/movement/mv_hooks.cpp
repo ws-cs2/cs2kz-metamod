@@ -29,7 +29,6 @@ void movement::InitDetours()
 	INIT_DETOUR(Friction);
 	INIT_DETOUR(WalkMove);
 	INIT_DETOUR(TryPlayerMove);
-	INIT_DETOUR(ClipVelocity);
 	INIT_DETOUR(CategorizePosition);
 	INIT_DETOUR(FinishGravity);
 	INIT_DETOUR(CheckFalling);
@@ -228,26 +227,8 @@ void FASTCALL movement::Detour_WalkMove(CCSPlayer_MovementServices *ms, CMoveDat
 	player->OnWalkMovePost();
 }
 
-void FASTCALL movement::Detour_TryPlayerMove(CCSPlayer_MovementServices *ms, CMoveData *mv, Vector *pFirstDest, trace_t_s2 *pFirstTrace)
+internal void ClipVelocity_Custom(Vector &in, Vector &normal, Vector &out, f32 overbounce)
 {
-	MovementPlayer *player = g_pPlayerManager->ToPlayer(ms);
-	player->OnTryPlayerMove(pFirstDest, pFirstTrace);
-	TryPlayerMove(ms, mv, pFirstDest, pFirstTrace);
-	player->OnTryPlayerMovePost(pFirstDest, pFirstTrace);
-}
-
-void FASTCALL movement::Detour_ClipVelocity(CCSPlayer_MovementServices *ms, Vector &in, Vector &normal, Vector &out, f32 overbounce)
-{
-	// TODO: CVAR creation waiting room
-	// HACK HACK
-	// kz stuff shouldn't even be used in here!
-	KZPlayer *player = g_pKZPlayerManager->ToPlayer(ms);
-	const char *mv_rampbug_fixValue = player->modeService->GetModeConVarValues()[0];
-	if (mv_rampbug_fixValue[0] == '0')
-	{
-		ClipVelocity(ms, in, normal, out, overbounce);
-		return;
-	}
 	// Determine how far along plane to slide based on incoming direction.
 	f32 backoff = DotProduct(in, normal) * overbounce;
 	
@@ -260,6 +241,291 @@ void FASTCALL movement::Detour_ClipVelocity(CCSPlayer_MovementServices *ms, Vect
 	// Rampbug/wallbug fix: always move a little bit away from the plane
 	float adjust = -0.5f;
 	out -= (normal * adjust);
+}
+
+#define	MAX_CLIP_PLANES	4
+#define GM_MV_OPTIMISATIONS 1
+// From https://github.com/ValveSoftware/source-sdk-2013/blob/master/mp/src/game/shared/gamemovement.cpp#L2560
+internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv, Vector *pFirstDest, trace_t_s2 *pFirstTrace)
+{
+	int			bumpcount, numbumps;
+	Vector		dir;
+	float		d;
+	int			numplanes;
+	Vector		planes[MAX_CLIP_PLANES];
+	Vector		primal_velocity, original_velocity;
+	Vector      new_velocity;
+	int			i, j;
+	trace_t_s2	pm;
+	Vector		end;
+	float		time_left, allFraction;
+	int			blocked;		
+	
+	numbumps  = 4;           // Bump up to four times
+	
+	blocked   = 0;           // Assume not blocked
+	numplanes = 0;           //  and not sliding along any planes
+	
+	VectorCopy (mv->m_vecVelocity, original_velocity);  // Store original velocity
+	VectorCopy (mv->m_vecVelocity, primal_velocity);
+	
+	allFraction = 0;
+	gpGlobals = g_pKZUtils->GetServerGlobals();
+	time_left = gpGlobals->frametime;   // Total time for this movement operation.
+	
+	new_velocity.Init();
+	
+	CCSPlayerPawn *player = g_pPlayerManager->ToPlayer(ms)->GetPawn();
+	
+	CTraceFilterPlayerMovementCS filter;
+	utils::InitPlayerMovementTraceFilter(filter, player, player->m_Collision().m_collisionAttribute().m_nInteractsWith(), COLLISION_GROUP_PLAYER_MOVEMENT);
+	
+	bbox_t bounds;
+	bounds.mins = { -16, -16, 0 };
+	bounds.maxs = { 16, 16, 72 };
+	
+	if (ms->m_bDucked())
+	{
+		bounds.maxs.z = 54;
+	}
+	
+	for (bumpcount=0 ; bumpcount < numbumps; bumpcount++)
+	{
+		if ( mv->m_vecVelocity.Length() == 0.0 )
+			break;
+		
+		// Assume we can move all the way from the current origin to the
+		//  end point.
+		VectorMA( mv->m_vecAbsOrigin, time_left, mv->m_vecVelocity, end );
+		
+		// See if we can make it from origin to end point.
+		if ( GM_MV_OPTIMISATIONS )
+		{
+			// If their velocity Z is 0, then we can avoid an extra trace here during WalkMove.
+			if ( pFirstDest && end == *pFirstDest )
+				pm = *pFirstTrace;
+			else
+			{
+				utils::TracePlayerBBox( mv->m_vecAbsOrigin, end, bounds, &filter, pm );
+			}
+		}
+		else
+		{
+			utils::TracePlayerBBox( mv->m_vecAbsOrigin, end, bounds, &filter, pm );
+		}
+		
+		allFraction += pm.fraction;
+		
+		// If we started in a solid object, or we were in solid space
+		//  the whole way, zero out our velocity and return that we
+		//  are blocked by floor and wall.
+		trace_t_s2 stuckTest;
+		utils::TracePlayerBBox( end, mv->m_vecAbsOrigin, bounds, &filter, stuckTest );
+		if (pm.startsolid && pm.fraction == 0 && stuckTest.startsolid && stuckTest.fraction == 0)
+		{
+			// entity is trapped in another solid
+			// VectorCopy (vec3_origin, mv->m_vecVelocity);
+			// return;
+		}
+		
+		// If we moved some portion of the total distance, then
+		//  copy the end position into the pmove.origin and 
+		//  zero the plane counter.
+		if( pm.fraction > 0 )
+		{
+			if ( numbumps > 0 && pm.fraction == 1 )
+			{
+				// There's a precision issue with terrain tracing that can cause a swept box to successfully trace
+				// when the end position is stuck in the triangle.  Re-run the test with an uswept box to catch that
+				// case until the bug is fixed.
+				// If we detect getting stuck, don't allow the movement
+				trace_t_s2 stuck;
+				utils::TracePlayerBBox( pm.endpos, pm.endpos, bounds, &filter, stuck );
+				if ( stuck.startsolid || stuck.fraction != 1.0f )
+				{
+					//Msg( "Player will become stuck!!!\n" );
+					VectorCopy (vec3_origin, mv->m_vecVelocity);
+					break;
+				}
+			}
+			
+			// actually covered some distance
+			mv->m_vecAbsOrigin = pm.endpos;
+			VectorCopy (mv->m_vecVelocity, original_velocity);
+			numplanes = 0;
+		}
+		
+		// If we covered the entire distance, we are done
+		//  and can return.
+		if (pm.fraction == 1)
+		{
+			break;		// moved the entire distance
+		}
+		
+		// Save entity that blocked us (since fraction was < 1.0)
+		//  for contact
+		// Add it if it's not already in the list!!!
+		// TODO:?
+		//MoveHelper( )->AddToTouched( pm, mv->m_vecVelocity );
+		
+		// If the plane we hit has a high z component in the normal, then
+		//  it's probably a floor
+		if (pm.planeNormal[2] > 0.7)
+		{
+			blocked |= 1;		// floor
+		}
+		// If the plane has a zero z component in the normal, then it's a 
+		//  step or wall
+		if (!pm.planeNormal[2])
+		{
+			blocked |= 2;		// step / wall
+		}
+		
+		// Reduce amount of m_flFrameTime left by total time left * fraction
+		//  that we covered.
+		time_left -= time_left * pm.fraction;
+		
+		// Did we run out of planes to clip against?
+		if (numplanes >= MAX_CLIP_PLANES)
+		{	
+			// this shouldn't really happen
+			//  Stop our movement if so.
+			VectorCopy (vec3_origin, mv->m_vecVelocity);
+			//Con_DPrintf("Too many planes 4\n");
+			
+			break;
+		}
+		
+		// Set up next clipping plane
+		VectorCopy (pm.planeNormal, planes[numplanes]);
+		numplanes++;
+		
+		// modify original_velocity so it parallels all of the clip planes
+		//
+		
+		// reflect player velocity 
+		// Only give this a try for first impact plane because you can get yourself stuck in an acute corner by jumping in place
+		//  and pressing forward and nobody was really using this bounce/reflection feature anyway...
+		if ( numplanes == 1 &&
+			player->m_MoveType() == MOVETYPE_WALK &&
+			player->m_hGroundEntity() == NULL )	
+		{
+			for ( i = 0; i < numplanes; i++ )
+			{
+				if ( planes[i][2] > 0.7  )
+				{
+					// floor or slope
+					ClipVelocity_Custom( original_velocity, planes[i], new_velocity, 1 );
+					VectorCopy( new_velocity, original_velocity );
+				}
+				else
+				{
+					// TODO: m_flSurfaceFriction and maybe sv_bounce
+					ClipVelocity_Custom( original_velocity, planes[i], new_velocity, 1.0);
+				}
+			}
+			
+			VectorCopy( new_velocity, mv->m_vecVelocity );
+			VectorCopy( new_velocity, original_velocity );
+		}
+		else
+		{
+			for (i=0 ; i < numplanes ; i++)
+			{
+				ClipVelocity_Custom (
+							  original_velocity,
+							  planes[i],
+							  mv->m_vecVelocity,
+							  1);
+				
+				for (j=0 ; j<numplanes ; j++)
+					if (j != i)
+				{
+					// Are we now moving against this plane?
+					if (mv->m_vecVelocity.Dot(planes[j]) < 0)
+						break;	// not ok
+				}
+				if (j == numplanes)  // Didn't have to clip, so we're ok
+					break;
+			}
+			
+			// Did we go all the way through plane set
+			if (i != numplanes)
+			{	// go along this plane
+				// pmove.velocity is set in clipping call, no need to set again.
+				;  
+			}
+			else
+			{	// go along the crease
+				if (numplanes != 2)
+				{
+					VectorCopy (vec3_origin, mv->m_vecVelocity);
+					break;
+				}
+				CrossProduct (planes[0], planes[1], dir);
+				dir.NormalizeInPlace();
+				d = dir.Dot(mv->m_vecVelocity);
+				VectorScale (dir, d, mv->m_vecVelocity );
+			}
+			
+			//
+			// if original velocity is against the original velocity, stop dead
+			// to avoid tiny occilations in sloping corners
+			//
+			d = mv->m_vecVelocity.Dot(primal_velocity);
+			if (d <= 0)
+			{
+				//Con_DPrintf("Back\n");
+				VectorCopy (vec3_origin, mv->m_vecVelocity);
+				break;
+			}
+		}
+	}
+	
+	if ( allFraction == 0 )
+	{
+		VectorCopy (vec3_origin, mv->m_vecVelocity);
+	}
+	
+#if 0
+	// Check if they slammed into a wall
+	float fSlamVol = 0.0f;
+	
+	float fLateralStoppingAmount = primal_velocity.Length2D() - mv->m_vecVelocity.Length2D();
+	if ( fLateralStoppingAmount > PLAYER_MAX_SAFE_FALL_SPEED * 2.0f )
+	{
+		fSlamVol = 1.0f;
+	}
+	else if ( fLateralStoppingAmount > PLAYER_MAX_SAFE_FALL_SPEED )
+	{
+		fSlamVol = 0.85f;
+	}
+	
+	PlayerRoughLandingEffects( fSlamVol );
+	
+	return blocked;
+#endif
+}
+
+void FASTCALL movement::Detour_TryPlayerMove(CCSPlayer_MovementServices *ms, CMoveData *mv, Vector *pFirstDest, trace_t_s2 *pFirstTrace)
+{
+	MovementPlayer *player = g_pPlayerManager->ToPlayer(ms);
+	player->OnTryPlayerMove(pFirstDest, pFirstTrace);
+	
+	// TODO: CVAR creation waiting room
+	// HACK HACK
+	// kz stuff shouldn't even be used in here!
+	KZPlayer *kzPlayer = g_pKZPlayerManager->ToPlayer(ms);
+	const char *mv_rampbug_fixValue = kzPlayer->modeService->GetModeConVarValues()[0];
+	if (mv_rampbug_fixValue[0] == '0')
+	{
+		TryPlayerMove(ms, mv, pFirstDest, pFirstTrace);
+	}
+	else
+	{
+		TryPlayerMove_Custom(ms, mv, pFirstDest, pFirstTrace);
+	}
+	player->OnTryPlayerMovePost(pFirstDest, pFirstTrace);
 }
 
 void FASTCALL movement::Detour_CategorizePosition(CCSPlayer_MovementServices *ms, CMoveData *mv, bool bStayOnGround)

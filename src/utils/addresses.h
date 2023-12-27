@@ -181,10 +181,6 @@ namespace sigs
 
 	// "CCSPlayer_MovementServices::TryPlayerMove() Trace ended stuck"
 	DECLARE_SIG(TryPlayerMove, "\x48\x8B\xC4\x4C\x89\x48\x20\x4C\x89\x40\x18\x48\x89\x50\x10\x55\x53\x56\x57\x41\x54\x41\x55");
-	
-	// somewhere in TryPlayerMove, uses sv_bounce.
-	// TODO: add linux sig
-	DECLARE_SIG(ClipVelocity, "\x48\x83\xEC\x18\xF2\x0F\x10\x12\xF2");
 
 	// sub_18061AF90(a1, a2, *(*(a1 + 48) + 864i64) & 1); <- this one
 	// sub_18061D5B0(a1, a2, "PlayerMove_PostMove");
