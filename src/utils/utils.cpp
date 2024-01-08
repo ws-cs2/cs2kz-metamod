@@ -36,6 +36,7 @@ void modules::Initialize()
 	modules::server = new CModule(GAMEBIN, "server");
 	modules::schemasystem = new CModule(ROOTBIN, "schemasystem");
 	modules::steamnetworkingsockets = new CModule(ROOTBIN, "steamnetworkingsockets");
+	modules::vphysics2 = new CModule(ROOTBIN, "vphysics2");
 }
 
 bool interfaces::Initialize(ISmmAPI *ismm, char *error, size_t maxlen)
@@ -78,7 +79,7 @@ bool utils::Initialize(ISmmAPI *ismm, char *error, size_t maxlen)
 	RESOLVE_SIG(modules::server, sigs::SnapViewAngles, utils::SnapViewAngles);
 	RESOLVE_SIG(modules::server, sigs::EmitSound, utils::EmitSound);
 	RESOLVE_SIG(modules::server, sigs::FindEntityByClassname, FindEntityByClassnameFunc);
-
+	
 	InitDetours();
 	return true;
 }

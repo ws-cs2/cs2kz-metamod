@@ -243,6 +243,76 @@ internal void ClipVelocity_Custom(Vector &in, Vector &normal, Vector &out, f32 o
 	out -= (normal * adjust);
 }
 
+void TracePlayerBBox_Custom(const Vector &start, const Vector &end, const bbox_t &bounds, CTraceFilterPlayerMovementCS *filter, trace_t_s2 &pm)
+{
+	utils::TracePlayerBBox(start, end, bounds, filter, pm);
+	
+	trace_t_s2 test;
+	
+	Vector direction = end - start;
+	f32 totalDistance = VectorNormalize(direction);
+	
+	f32 dotA = direction.Dot(pm.planeNormal);
+	if (pm.fraction < 1 && dotA < -0.25f)
+	{
+		Vector normal = pm.planeNormal;
+		if (dotA > -0.9999f)
+		{
+			normal = CrossProduct(pm.planeNormal, direction);
+			VectorNormalize(normal);
+		}
+		else
+		{
+			// for breakpoint
+			normal = pm.planeNormal;
+		}
+		Vector pos1 = pm.endpos + (normal * 0.03125f);
+		Vector pos2 = pm.endpos - (normal * 0.03125f);
+		utils::TracePlayerBBox(pos1, pos2, bounds, filter, test);
+		if (test.startsolid)
+		{
+			utils::TracePlayerBBox(pos2, pos1, bounds, filter, test);
+		}
+		if (test.fraction < 1 && !test.startsolid)
+		{
+			f32 dot = direction.Dot(test.planeNormal);
+			if (dot >= -0.25f)
+			{
+				// Msg("Success! a %f b %f\n", dotA, dot);
+				pm.planeNormal = test.planeNormal;
+			}
+			else
+			{
+				// Msg("Fail :(! a %f b %f\n", dotA, dot);
+			}
+		}
+	}
+	
+	// attempt to travel the rest of the distance if we're stuck somewhere or stuck on an edge
+	for (i32 i = 0; i < 4; i++)
+	{
+		utils::TracePlayerBBox(pm.endpos, pm.endpos, bounds, filter, test);
+		if (pm.fraction != 1.0 && test.startsolid)
+		{
+			utils::TracePlayerBBox(pm.endpos + (test.planeNormal * 0.03125f), end, bounds, filter, test);
+			if (test.fraction)
+			{
+				pm.endpos = test.endpos;
+				if (totalDistance > 0.0)
+				{
+					pm.fraction = VectorLength(test.endpos - start) / totalDistance;
+					pm.endpos = test.endpos;
+					// pm.planeNormal = test.planeNormal;
+				}
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+}
+
 #define	MAX_CLIP_PLANES	4
 #define GM_MV_OPTIMISATIONS 1
 // From https://github.com/ValveSoftware/source-sdk-2013/blob/master/mp/src/game/shared/gamemovement.cpp#L2560
@@ -306,12 +376,12 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 				pm = *pFirstTrace;
 			else
 			{
-				utils::TracePlayerBBox( mv->m_vecAbsOrigin, end, bounds, &filter, pm );
+				TracePlayerBBox_Custom( mv->m_vecAbsOrigin, end, bounds, &filter, pm );
 			}
 		}
 		else
 		{
-			utils::TracePlayerBBox( mv->m_vecAbsOrigin, end, bounds, &filter, pm );
+			TracePlayerBBox_Custom( mv->m_vecAbsOrigin, end, bounds, &filter, pm );
 		}
 		
 		allFraction += pm.fraction;
@@ -320,7 +390,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 		//  the whole way, zero out our velocity and return that we
 		//  are blocked by floor and wall.
 		trace_t_s2 stuckTest;
-		utils::TracePlayerBBox( end, mv->m_vecAbsOrigin, bounds, &filter, stuckTest );
+		TracePlayerBBox_Custom( end, mv->m_vecAbsOrigin, bounds, &filter, stuckTest );
 		if (pm.startsolid && pm.fraction == 0 && stuckTest.startsolid && stuckTest.fraction == 0)
 		{
 			// entity is trapped in another solid
@@ -340,7 +410,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 				// case until the bug is fixed.
 				// If we detect getting stuck, don't allow the movement
 				trace_t_s2 stuck;
-				utils::TracePlayerBBox( pm.endpos, pm.endpos, bounds, &filter, stuck );
+				TracePlayerBBox_Custom( pm.endpos, pm.endpos, bounds, &filter, stuck );
 				if ( stuck.startsolid || stuck.fraction != 1.0f )
 				{
 					//Msg( "Player will become stuck!!!\n" );

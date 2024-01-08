@@ -24,6 +24,7 @@ namespace modules
 	inline CModule *server;
 	inline CModule *schemasystem;
 	inline CModule *steamnetworkingsockets;
+	inline CModule *vphysics2;
 	void Initialize();
 }
 
@@ -206,6 +207,10 @@ namespace sigs
 	// the function that string appears in is NOT CBasePlayerPawn::ProcessUserCmds, it's somewhere
 	// in that function.
 	DECLARE_SIG(ProcessUsercmds, "\x48\x8B\xC4\x44\x88\x48\x20\x44\x89\x40\x18\x48\x89\x50\x10\x53");
+	
+	// exported function from vphysics2 dynamic library
+	DECLARE_SIG(RnMeshCreate, "\x4C\x89\x44\x24\x18\x55\x53\x56\x57\x48");
+	DECLARE_SIG(BuildMeshWings, "\x4C\x89\x44\x24\x18\x48\x89\x4C\x24\x08\x55\x53\x56\x57\x41\x54\x41\x55\x41\x56\x41\x57\x48\x8D\x6C\x24\xE1\x48\x81\xEC\x98");
 #else
 	DECLARE_SIG(CEntitySystem_ctor, "\x55\x48\x89\xE5\x41\x54\x49\x89\xFC\x53\x48\x8D\x1D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x48\x8D\x05\x2A\x2A\x2A\x2A");
 	DECLARE_SIG(CEntitySystem_CreateEntity, "\x55\x48\x89\xE5\x41\x57\x41\x56\x49\x89\xD6\x41\x55\x45");

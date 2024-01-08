@@ -15,6 +15,8 @@ DECLARE_DETOUR(CBaseTrigger_StartTouch, Detour_CBaseTrigger_StartTouch, &modules
 DECLARE_DETOUR(CBaseTrigger_EndTouch, Detour_CBaseTrigger_EndTouch, &modules::server);
 DECLARE_DETOUR(RecvServerBrowserPacket, Detour_RecvServerBrowserPacket, &modules::steamnetworkingsockets);
 DECLARE_DETOUR(CCSPP_Teleport, Detour_CCSPP_Teleport, &modules::server);
+DECLARE_DETOUR(RnMeshCreate, Detour_RnMeshCreate, &modules::vphysics2);
+DECLARE_DETOUR(BuildMeshWings, Detour_BuildMeshWings, &modules::vphysics2);
 
 DECLARE_MOVEMENT_DETOUR(ProcessUsercmds);
 DECLARE_MOVEMENT_DETOUR(GetMaxSpeed);
@@ -46,6 +48,8 @@ void InitDetours()
 	INIT_DETOUR(CBaseTrigger_StartTouch);
 	INIT_DETOUR(CBaseTrigger_EndTouch);
 	INIT_DETOUR(RecvServerBrowserPacket);
+	INIT_DETOUR(RnMeshCreate);
+	INIT_DETOUR(BuildMeshWings);
 }
 
 void FlushAllDetours()
@@ -151,4 +155,17 @@ void Detour_CCSPP_Teleport(CCSPlayerPawn *this_, const Vector *newPosition, cons
 		player->OnTeleport(newPosition, newAngles, newVelocity);
 	}
 	CCSPP_Teleport(this_, newPosition, newAngles, newVelocity);
+}
+
+internal i32 *Detour_RnMeshCreate(i32 a1, const u32 *a2, i64 a3, i32 a4, const f32 *a5, CResourceStreamFixed *a6, i32 *a7)
+{
+	i32 *result = RnMeshCreate(a1, a2, a3, a4, a5, a6, a7);
+	return result;
+}
+
+internal i64 Detour_BuildMeshWings(u32 *a1, i32 *a2, i32 *a3)
+{
+	i64 result = BuildMeshWings(a1, a2, a3);
+	return result;
+	// return 1;
 }

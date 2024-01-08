@@ -34,7 +34,6 @@ namespace movement
 	void FASTCALL Detour_Friction(CCSPlayer_MovementServices *, CMoveData *);
 	void FASTCALL Detour_WalkMove(CCSPlayer_MovementServices *, CMoveData *);
 	void FASTCALL Detour_TryPlayerMove(CCSPlayer_MovementServices *, CMoveData *, Vector *, trace_t_s2 *);
-	void FASTCALL Detour_ClipVelocity(CCSPlayer_MovementServices *, Vector &, Vector &, Vector &, f32);
 	void FASTCALL Detour_CategorizePosition(CCSPlayer_MovementServices *, CMoveData *, bool);
 	void FASTCALL Detour_FinishGravity(CCSPlayer_MovementServices *, CMoveData *);
 	void FASTCALL Detour_CheckFalling(CCSPlayer_MovementServices *, CMoveData *);
@@ -204,3 +203,5 @@ public:
 };
 
 extern CMovementPlayerManager *g_pPlayerManager;
+
+void TracePlayerBBox_Custom(const Vector &start, const Vector &end, const bbox_t &bounds, CTraceFilterPlayerMovementCS *filter, trace_t_s2 &pm);
