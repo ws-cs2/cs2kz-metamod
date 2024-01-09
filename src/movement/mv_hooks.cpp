@@ -235,7 +235,7 @@ internal void ClipVelocity_Custom(Vector &in, Vector &normal, Vector &out, f32 o
 	for (i32 i = 0; i < 3; i++)
 	{
 		f32 change = normal[i] * backoff;
-		out[i] = in[i] - change; 
+		out[i] = in[i] - change;
 	}
 	
 	// Rampbug/wallbug fix: always move a little bit away from the plane
@@ -253,6 +253,52 @@ void TracePlayerBBox_Custom(const Vector &start, const Vector &end, const bbox_t
 	f32 totalDistance = VectorNormalize(direction);
 	
 	f32 dotA = direction.Dot(pm.planeNormal);
+	
+	if (pm.fraction < 1 && dotA < -0.25f)
+	{
+		// TODO: this will be 0 if direction is perpendicular to (0,0,1)
+		Vector perp1 = CrossProduct(direction, Vector(0, 0, 1));
+		Vector perp2 = CrossProduct(direction, perp1);
+		VectorNormalize(perp1);
+		VectorNormalize(perp2);
+		Vector perp3 = -perp1;
+		Vector perp4 = -perp2;
+		
+		trace_t_s2 tr[4];
+		utils::TracePlayerBBox(pm.endpos, pm.endpos + perp1, bounds, filter, tr[0]);
+		utils::TracePlayerBBox(pm.endpos, pm.endpos + perp2, bounds, filter, tr[1]);
+		utils::TracePlayerBBox(pm.endpos, pm.endpos + perp3, bounds, filter, tr[2]);
+		utils::TracePlayerBBox(pm.endpos, pm.endpos + perp4, bounds, filter, tr[3]);
+		
+		i32 closest = -1;
+		i32 closestFrac = 2.0f;
+		for (i32 i = 0; i < 4; i++)
+		{
+			if (tr[i].fraction < closestFrac && tr[i].fraction != 1.0)
+			{
+				closest = i;
+				closestFrac = tr[i].fraction;
+			}
+		}
+		
+		if (closest != -1)
+		{
+			f32 originalFrac = pm.fraction;
+			Vector offset = tr[closest].planeNormal * 0.0625f;
+			utils::TracePlayerBBox(
+				pm.endpos + offset,
+				end + offset, bounds, filter, test
+			);
+			if (test.fraction != 0)
+			{
+				pm = test;
+				pm.startpos = start;
+				// pm.endpos -= offset;
+				pm.fraction = originalFrac + (1.0 - originalFrac) * pm.fraction;
+			}
+		}
+	}
+#if 0
 	if (pm.fraction < 1 && dotA < -0.25f)
 	{
 		Vector normal = pm.planeNormal;
@@ -311,6 +357,7 @@ void TracePlayerBBox_Custom(const Vector &start, const Vector &end, const bbox_t
 			}
 		}
 	}
+#endif
 }
 
 #define	MAX_CLIP_PLANES	4
