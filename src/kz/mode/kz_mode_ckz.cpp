@@ -519,18 +519,10 @@ f32 KZClassicModeService::GetPrestrafeGain()
 
 void KZClassicModeService::CheckVelocityQuantization()
 {
-	if (this->postProcessMovementZSpeed > this->player->currentMoveData->m_vecVelocity.z
-		&& this->postProcessMovementZSpeed - this->player->currentMoveData->m_vecVelocity.z < 0.03125f
-		// Colliding with a flat floor can result in a velocity of +0.0078125u/s, and this breaks ladders.
-		// The quantization accidentally fixed this bug...
-		&& fabs(this->player->currentMoveData->m_vecVelocity.z) > 0.03125f)
-	{
-		this->player->currentMoveData->m_vecVelocity.z = this->postProcessMovementZSpeed;
-	}
 	for (u32 i = 0; i < 3; i++)
 	{
 		if (this->player->currentMoveData->m_vecVelocity[i] < this->player->moveDataPost.m_vecVelocity[i]
-		&& this->player->currentMoveData->m_vecVelocity[i] - this->player->moveDataPost.m_vecVelocity[i] < 0.03125f)
+		&& this->player->moveDataPost.m_vecVelocity[i] - this->player->currentMoveData->m_vecVelocity[i] < 0.03125f)
 		{
 			if (i != 2 || (i == 2 && fabs(this->player->currentMoveData->m_vecVelocity.z) > 0.03125f))
 			{
