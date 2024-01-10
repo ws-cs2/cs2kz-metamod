@@ -1024,7 +1024,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 					{
 						trace_t_s2 stuck;
 						utils::TracePlayerBBox(pm2.endpos, pm2.endpos, bounds, &filter, stuck);
-						if (stuck.startsolid || !CloseEnough(stuck.fraction, 1.0f, FLT_EPSILON))
+						if (pm2.startsolid || stuck.startsolid || !CloseEnough(stuck.fraction, 1.0f, FLT_EPSILON))
 						{
 							has_valid_plane = false;
 							stuck_on_ramp = true;
