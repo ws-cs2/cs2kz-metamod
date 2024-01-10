@@ -27,7 +27,8 @@ SnapViewAngles_t *utils::SnapViewAngles = NULL;
 EmitSoundFunc_t *utils::EmitSound = NULL;
 TracePlayerBBox_t *utils::TracePlayerBBox = NULL;
 FindEntityByClassname_t *FindEntityByClassnameFunc = NULL;
-
+DebugLine_t *utils::DebugLine = NULL;
+DebugCross3D_t *utils::DebugCross3D = NULL;
 
 void modules::Initialize()
 {
@@ -79,6 +80,8 @@ bool utils::Initialize(ISmmAPI *ismm, char *error, size_t maxlen)
 	RESOLVE_SIG(modules::server, sigs::SnapViewAngles, utils::SnapViewAngles);
 	RESOLVE_SIG(modules::server, sigs::EmitSound, utils::EmitSound);
 	RESOLVE_SIG(modules::server, sigs::FindEntityByClassname, FindEntityByClassnameFunc);
+	RESOLVE_SIG(modules::server, sigs::DebugLine, DebugLine);
+	RESOLVE_SIG(modules::server, sigs::DebugCross3D, DebugCross3D);
 	
 	InitDetours();
 	return true;

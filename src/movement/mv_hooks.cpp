@@ -906,6 +906,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 			else
 			{
 				utils::TracePlayerBBox(mv->m_vecAbsOrigin, end, bounds, &filter, pm);
+				utils::DebugLine(pm.startpos, pm.endpos, 255, 0, 0, true, 1.0f);
 				if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm, bounds, &filter))
 				{
 					has_valid_plane = false;
@@ -918,6 +919,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 					bumpcount++;
 					trace_t_s2 pm2;
 					utils::TracePlayerBBox(pm.endpos, end, bounds, &filter, pm2);
+					utils::DebugLine(pm2.startpos, pm2.endpos, 0, 255, 0, true, 1.0f);
 					if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm2, bounds, &filter))
 					{
 						has_valid_plane = false;
@@ -936,6 +938,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 					{
 						Vector newStartPos = mv->m_vecAbsOrigin + pm2.planeNormal * 0.0625f;
 						utils::TracePlayerBBox(newStartPos, end, bounds, &filter, pm2);
+						utils::DebugLine(pm2.startpos, pm2.endpos, 0, 0, 255, true, 1.0f);
 						if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm2, bounds, &filter))
 						{
 							has_valid_plane = false;

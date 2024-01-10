@@ -21,6 +21,8 @@ typedef void EmitSoundFunc_t(IRecipientFilter &filter, CEntityIndex ent, const E
 #endif
 
 typedef void TracePlayerBBox_t(const Vector &start, const Vector &end, const bbox_t &bounds, CTraceFilterPlayerMovementCS *filter, trace_t_s2 &pm);
+typedef void DebugLine_t(const Vector &origin, const Vector &target, int r, int g, int b, bool noDepthTest, float duration);
+typedef void DebugCross3D_t(const Vector &position, float size, int r, int g, int b, bool noDepthTest, float flDuration);
 
 namespace utils
 {
@@ -43,6 +45,9 @@ namespace utils
 	extern SnapViewAngles_t *SnapViewAngles;
 	extern EmitSoundFunc_t *EmitSound;
 	extern TracePlayerBBox_t *TracePlayerBBox;
+	extern DebugLine_t *DebugLine;
+	extern DebugCross3D_t *DebugCross3D;
+
 
 	bool IsButtonDown(CInButtonState *buttons, u64 button, bool onlyDown = false);
 	CPlayerSlot GetEntityPlayerSlot(CBaseEntity2 *entity);
