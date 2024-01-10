@@ -25,8 +25,10 @@ namespace movement
 	void FASTCALL Detour_FullWalkMove(CCSPlayer_MovementServices *, CMoveData *, bool);
 	bool FASTCALL Detour_MoveInit(CCSPlayer_MovementServices *, CMoveData *);
 	bool FASTCALL Detour_CheckWater(CCSPlayer_MovementServices *, CMoveData *);
+	void FASTCALL Detour_WaterMove(CCSPlayer_MovementServices *, CMoveData *);
 	void FASTCALL Detour_CheckVelocity(CCSPlayer_MovementServices *, CMoveData *, const char *);
 	void FASTCALL Detour_Duck(CCSPlayer_MovementServices *, CMoveData *);
+	bool FASTCALL Detour_CanUnduck(CCSPlayer_MovementServices *, CMoveData *);
 	bool FASTCALL Detour_LadderMove(CCSPlayer_MovementServices *, CMoveData *);
 	void FASTCALL Detour_CheckJumpButton(CCSPlayer_MovementServices *, CMoveData *);
 	void FASTCALL Detour_OnJump(CCSPlayer_MovementServices *, CMoveData *);
@@ -49,20 +51,21 @@ public:
 
 	virtual CCSPlayerController *GetController();
 	virtual CCSPlayerPawn *GetPawn();
-	virtual CPlayerSlot GetPlayerSlot() { return index - 1; };
+	virtual CPlayerSlot GetPlayerSlot() { return index - 1; }
 	virtual CCSPlayer_MovementServices *GetMoveServices();
 
-	// TODO: this doesn't work during movement processing!
-	
+	// This doesn't work during movement processing!
 	virtual void Teleport(const Vector *origin, const QAngle *angles, const Vector *velocity);
+
 	virtual void GetOrigin(Vector *origin);
 	virtual void SetOrigin(const Vector &origin);
 	virtual void GetVelocity(Vector *velocity);
 	virtual void SetVelocity(const Vector &velocity);
 	virtual void GetAngles(QAngle *angles);
+
 	// It is not recommended use this to change the angle inside movement processing, it might not work!
 	virtual void SetAngles(const QAngle &angles);
-	
+
 	virtual TurnState GetTurning();
 	virtual bool IsButtonDown(InputBitMask_t button, bool onlyDown = false);
 	virtual void RegisterTakeoff(bool jumped);
@@ -90,11 +93,14 @@ public:
 	virtual void OnMoveInitPost() {};
 	virtual void OnCheckWater() {};
 	virtual void OnCheckWaterPost() {};
+	virtual void OnWaterMove() {};
+	virtual void OnWaterMovePost() {};
 	virtual void OnCheckVelocity(const char *) {};
 	virtual void OnCheckVelocityPost(const char *) {};
 	virtual void OnDuck() {};
 	virtual void OnDuckPost() {};
-	virtual void OnCanUnduck() {};
+	// Make an exception for this as it is the only time where we need to change the return value.
+	virtual int OnCanUnduck() { return -1; };
 	virtual void OnCanUnduckPost() {};
 	virtual void OnLadderMove() {};
 	virtual void OnLadderMovePost() {};
@@ -127,11 +133,11 @@ public:
 	virtual void OnChangeMoveType(MoveType_t oldMoveType) {};
 
 	virtual void OnTeleport(const Vector *origin, const QAngle *angles, const Vector *velocity) {};
-	
+
 	virtual void StartZoneStartTouch();
 	virtual void StartZoneEndTouch();
 	virtual void EndZoneStartTouch();
-	
+
 	void PlayErrorSound();
 
 public:
@@ -162,15 +168,18 @@ public:
 	Vector takeoffVelocity;
 	f32 takeoffTime{};
 	Vector takeoffGroundOrigin;
-	
+
 	Vector landingOrigin;
 	Vector landingVelocity;
 	f32 landingTime{};
 	Vector landingOriginActual;
 	f32 landingTimeActual{};
-	
-	i32 tickCount;
-	i32 timerStartTick;
+
+	i32 tickCount{};
+	i32 timerStartTick{};
+
+	bool enableWaterFixThisTick{};
+	bool ignoreNextCategorizePosition{};
 };
 
 class CMovementPlayerManager
@@ -203,5 +212,4 @@ public:
 };
 
 extern CMovementPlayerManager *g_pPlayerManager;
-
 void TracePlayerBBox_Custom(const Vector &start, const Vector &end, const bbox_t &bounds, CTraceFilterPlayerMovementCS *filter, trace_t_s2 &pm);

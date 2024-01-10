@@ -19,6 +19,7 @@ void MovementPlayer::OnProcessMovementPost()
 	this->lastProcessedTickcount = g_pKZUtils->GetServerGlobals()->tickcount;
 	this->oldAngles = this->moveDataPost.m_vecViewAngles;
 	this->oldWalkMoved = this->walkMoved;
+	this->enableWaterFixThisTick = false;
 }
 
 CCSPlayerController *MovementPlayer::GetController()
@@ -38,13 +39,19 @@ CCSPlayerController *MovementPlayer::GetController()
 CCSPlayerPawn *MovementPlayer::GetPawn()
 {
 	CCSPlayerController *controller = this->GetController();
-	if (!controller) return nullptr;
+	if (!controller)
+	{
+		return nullptr;
+	}
 	return controller->m_hPlayerPawn().Get();
 }
 
 CCSPlayer_MovementServices *MovementPlayer::GetMoveServices()
 {
-	if (!this->GetPawn()) return nullptr;
+	if (!this->GetPawn())
+	{
+		return nullptr;
+	}
 	return static_cast<CCSPlayer_MovementServices *>(this->GetPawn()->m_pMovementServices());
 };
 
@@ -57,8 +64,10 @@ void MovementPlayer::GetOrigin(Vector *origin)
 	else
 	{
 		CBasePlayerPawn *pawn = this->GetPawn();
-		if (!pawn) return;
-
+		if (!pawn)
+		{
+			return;
+		}
 		*origin = pawn->m_CBodyComponent()->m_pSceneNode()->m_vecAbsOrigin();
 	}
 }
@@ -66,7 +75,10 @@ void MovementPlayer::GetOrigin(Vector *origin)
 void MovementPlayer::Teleport(const Vector *origin, const QAngle *angles, const Vector *velocity)
 {
 	CBasePlayerPawn *pawn = this->GetPawn();
-	if (!pawn) return;
+	if (!pawn)
+	{
+		return;
+	}
 	// We handle angles differently.
 	this->SetAngles(*angles);
 	CALL_VIRTUAL(void, offsets::Teleport, pawn, origin, NULL, velocity);
@@ -74,9 +86,19 @@ void MovementPlayer::Teleport(const Vector *origin, const QAngle *angles, const 
 
 void MovementPlayer::SetOrigin(const Vector &origin)
 {
-	CBasePlayerPawn *pawn = this->GetPawn();
-	if (!pawn) return;
-	CALL_VIRTUAL(void, offsets::Teleport, pawn, &origin, NULL, NULL);
+	if (this->processingMovement && this->currentMoveData)
+	{
+		this->currentMoveData->m_vecAbsOrigin = origin;
+	}
+	else
+	{
+		CBasePlayerPawn *pawn = this->GetPawn();
+		if (!pawn)
+		{
+			return;
+		}
+		CALL_VIRTUAL(void, offsets::Teleport, pawn, &origin, NULL, NULL);
+	}
 }
 
 void MovementPlayer::GetVelocity(Vector *velocity)
@@ -88,7 +110,10 @@ void MovementPlayer::GetVelocity(Vector *velocity)
 	else
 	{
 		CBasePlayerPawn *pawn = this->GetPawn();
-		if (!pawn) return;
+		if (!pawn)
+		{
+			return;
+		}
 		*velocity = pawn->m_vecAbsVelocity();
 	}
 }
@@ -102,7 +127,10 @@ void MovementPlayer::SetVelocity(const Vector &velocity)
 	else
 	{
 		CBasePlayerPawn *pawn = this->GetPawn();
-		if (!pawn) return;
+		if (!pawn)
+		{
+			return;
+		}
 		CALL_VIRTUAL(void, offsets::Teleport, pawn, NULL, NULL, &velocity);
 	}
 }
@@ -122,7 +150,10 @@ void MovementPlayer::GetAngles(QAngle *angles)
 void MovementPlayer::SetAngles(const QAngle &angles)
 {
 	CBasePlayerPawn *pawn = this->GetPawn();
-	if (!pawn) return;
+	if (!pawn)
+	{
+		return;
+	}
 
 	// Don't change the pitch of the absolute angles because it messes with the player model.
 	QAngle absAngles = angles;
@@ -134,18 +165,35 @@ void MovementPlayer::SetAngles(const QAngle &angles)
 
 TurnState MovementPlayer::GetTurning()
 {
-	QAngle currentAngle = this->moveDataPre.m_vecViewAngles;
+	QAngle currentAngle;
+	if (this->processingMovement && this->currentMoveData)
+	{
+		currentAngle = this->currentMoveData->m_vecViewAngles;
+	}
+	else
+	{
+		currentAngle = this->moveDataPre.m_vecViewAngles;
+	}
 	bool turning = this->oldAngles.y != currentAngle.y;
-	if (!turning) return TURN_NONE;
+	if (!turning)
+	{
+		return TURN_NONE;
+	}
 	if (currentAngle.y < this->oldAngles.y - 180
-		|| (currentAngle.y > this->oldAngles.y && currentAngle.y < this->oldAngles.y + 180)) return TURN_LEFT;
+		|| (currentAngle.y > this->oldAngles.y && currentAngle.y < this->oldAngles.y + 180))
+	{
+		return TURN_LEFT;
+	}
 	return TURN_RIGHT;
 }
 
 bool MovementPlayer::IsButtonDown(InputBitMask_t button, bool onlyDown)
 {
 	CCSPlayer_MovementServices *ms = this->GetMoveServices();
-	if (!ms) return false;
+	if (!ms)
+	{
+		return false;
+	}
 	CInButtonState *buttons = ms->m_nButtons();
 	return utils::IsButtonDown(buttons, button, onlyDown);
 }
@@ -157,7 +205,7 @@ f32 MovementPlayer::GetGroundPosition()
 
 	CTraceFilterPlayerMovementCS filter;
 	utils::InitPlayerMovementTraceFilter(filter, this->GetPawn(), this->GetPawn()->m_Collision().m_collisionAttribute().m_nInteractsWith(), COLLISION_GROUP_PLAYER_MOVEMENT);
-	
+
 	Vector ground = mv->m_vecAbsOrigin;
 	ground.z -= 2;
 
@@ -173,9 +221,12 @@ f32 MovementPlayer::GetGroundPosition()
 	utils::InitGameTrace(&trace);
 
 	utils::TracePlayerBBox(mv->m_vecAbsOrigin, ground, bounds, &filter, trace);
-	
+
 	// Doesn't hit anything, fall back to the original ground
-	if (trace.startsolid || trace.fraction == 1.0f) return mv->m_vecAbsOrigin.z;
+	if (trace.startsolid || trace.fraction == 1.0f)
+	{
+		return mv->m_vecAbsOrigin.z;
+	}
 
 	return trace.endpos.z;
 }

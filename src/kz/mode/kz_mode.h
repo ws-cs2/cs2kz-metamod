@@ -9,16 +9,15 @@ class KZPlayer;
 class KZModeService : public KZBaseService
 {
 	using KZBaseService::KZBaseService;
-	
+
 public:
-	virtual const char* GetModeName() = 0;
-	virtual const char* GetModeShortName() = 0;
+	virtual const char *GetModeName() = 0;
+	virtual const char *GetModeShortName() = 0;
 
 	// Jumpstats
 	virtual DistanceTier GetDistanceTier(JumpType jumpType, f32 distance) = 0;
 	virtual const char **GetModeConVarValues() = 0;
-	virtual f32 GetPlayerMaxSpeed() { return 0.0f; };
-
+	virtual f32 GetPlayerMaxSpeed() { return 0.0f; }
 	// Movement hooks
 	virtual void OnProcessUsercmds(void *, int) {};
 	virtual void OnProcessUsercmdsPost(void *, int) {};
@@ -36,11 +35,14 @@ public:
 	virtual void OnMoveInitPost() {};
 	virtual void OnCheckWater() {};
 	virtual void OnCheckWaterPost() {};
+	virtual void OnWaterMove() {};
+	virtual void OnWaterMovePost() {};
 	virtual void OnCheckVelocity(const char *) {};
 	virtual void OnCheckVelocityPost(const char *) {};
 	virtual void OnDuck() {};
 	virtual void OnDuckPost() {};
-	virtual void OnCanUnduck() {};
+	// Make an exception for this as it is the only time where we need to change the return value.
+	virtual int OnCanUnduck() { return -1; };
 	virtual void OnCanUnduckPost() {};
 	virtual void OnLadderMove() {};
 	virtual void OnLadderMovePost() {};
@@ -78,7 +80,7 @@ public:
 	virtual void EndZoneStartTouch() {};
 };
 
-typedef KZModeService* (*ModeServiceFactory)(KZPlayer *player);
+typedef KZModeService *(*ModeServiceFactory)(KZPlayer *player);
 
 class KZModeManager
 {
@@ -148,6 +150,6 @@ namespace KZ::mode
 	void EnableReplicatedModeCvars();
 
 	KZModeManager *GetKZModeManager();
-	
+
 	void RegisterCommands();
 };

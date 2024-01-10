@@ -24,6 +24,7 @@ typedef void TracePlayerBBox_t(const Vector &start, const Vector &end, const bbo
 typedef void DebugLine_t(const Vector &origin, const Vector &target, int r, int g, int b, bool noDepthTest, float duration);
 typedef void DebugCross3D_t(const Vector &position, float size, int r, int g, int b, bool noDepthTest, float flDuration);
 
+
 namespace utils
 {
 	bool Initialize(ISmmAPI *ismm, char *error, size_t maxlen);
@@ -35,7 +36,7 @@ namespace utils
 	void SetEntityMoveType(CBaseEntity2 *entity, MoveType_t movetype);
 	void EntityCollisionRulesChanged(CBaseEntity2 *entity);
 	CBaseEntity2 *FindEntityByClassname(CEntityInstance *start, const char *name);
-	
+
 	CBasePlayerController *GetController(CBaseEntity2 *entity);
 	CBasePlayerController *GetController(CPlayerSlot slot);
 
@@ -48,16 +49,15 @@ namespace utils
 	extern DebugLine_t *DebugLine;
 	extern DebugCross3D_t *DebugCross3D;
 
-
 	bool IsButtonDown(CInButtonState *buttons, u64 button, bool onlyDown = false);
 	CPlayerSlot GetEntityPlayerSlot(CBaseEntity2 *entity);
 
 	// Normalize the angle between -180 and 180.
 	f32 NormalizeDeg(f32 a);
 	// Gets the difference in angle between 2 angles. 
-    // c can be PI (for radians) or 180.0 (for degrees);
-	f32 GetAngleDifference(const f32 x, const f32 y, const f32 c);
-	
+	// c can be PI (for radians) or 180.0 (for degrees);
+	f32 GetAngleDifference(const f32 x, const f32 y, const f32 c, bool relative = false);
+
 	// Print functions
 	void PrintConsole(CBaseEntity2 *entity, const char *format, ...);
 	void PrintChat(CBaseEntity2 *entity, const char *format, ...);
@@ -70,9 +70,9 @@ namespace utils
 	void PrintCentreAll(const char *format, ...);
 	void PrintAlertAll(const char *format, ...);
 	void PrintHTMLCentreAll(const char *format, ...); // This one uses HTML formatting.
-	
+
 	i32 FormatTimerText(i32 ticks, char *buffer, i32 bufferSize);
-	
+
 	void PlaySoundToClient(CPlayerSlot player, const char *sound, f32 volume = 1.0f);
 
 	// Color print

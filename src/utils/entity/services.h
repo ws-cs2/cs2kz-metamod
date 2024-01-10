@@ -12,10 +12,10 @@ class CPlayerPawnComponent
 public:
 	DECLARE_SCHEMA_CLASS(CPlayerPawnComponent);
 public:
-	uint8_t vtable[0x8];
-	uint8_t chainEntity[0x28]; // Unused
+	uint8 vtable[0x8];
+	uint8 chainEntity[0x28]; // Unused
 	CBasePlayerPawn *pawn; // 0x16
-	uint8_t __pad0030[0x6]; // 0x0
+	uint8 __pad0030[0x6]; // 0x0
 };
 
 class CPlayer_ObserverServices : public CPlayerPawnComponent
@@ -38,6 +38,7 @@ class CPlayer_MovementServices_Humanoid : public CPlayer_MovementServices
 {
 public:
 	DECLARE_SCHEMA_CLASS(CPlayer_MovementServices_Humanoid);
+	SCHEMA_FIELD(bool, m_bDucking)
 	SCHEMA_FIELD(bool, m_bDucked)
 	SCHEMA_FIELD(float, m_flSurfaceFriction)
 };
@@ -50,13 +51,14 @@ public:
 	SCHEMA_FIELD(Vector, m_vecLadderNormal)
 	SCHEMA_FIELD(bool, m_bOldJumpPressed)
 	SCHEMA_FIELD(float, m_flJumpPressedTime)
+	SCHEMA_FIELD(float, m_flDuckSpeed)
 };
 
 class CCSPlayer_ItemServices
 {
 public:
 	DECLARE_SCHEMA_CLASS(CCSPlayer_ItemServices);
-	
+
 	virtual ~CCSPlayer_ItemServices() = 0;
 private:
 	virtual void unk_01() = 0;
@@ -73,8 +75,8 @@ private:
 	virtual void unk_12() = 0;
 	virtual void unk_13() = 0;
 	virtual void unk_14() = 0;
-	virtual CBaseEntity* _GiveNamedItem(const char* pchName) = 0;
+	virtual CBaseEntity *_GiveNamedItem(const char *pchName) = 0;
 public:
-	virtual bool GiveNamedItemBool(const char* pchName) = 0;
-	virtual CBaseEntity* GiveNamedItem(const char* pchName) = 0;
+	virtual bool GiveNamedItemBool(const char *pchName) = 0;
+	virtual CBaseEntity *GiveNamedItem(const char *pchName) = 0;
 };

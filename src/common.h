@@ -12,7 +12,10 @@
 #include "entity2/entitysystem.h"
 #define MAXPLAYERS 64
 
-extern CGlobalVars *gpGlobals;
+#define ENGINE_FIXED_TICK_INTERVAL 0.015625f
+#define ENGINE_FIXED_TICK_RATE (1.0f / ENGINE_FIXED_TICK_INTERVAL)
+#define EPSILON 0.000001f
+
 extern CEntitySystem *g_pEntitySystem;
 
 #ifdef _WIN32
@@ -43,3 +46,6 @@ typedef uint64_t u64;
 
 typedef float f32;
 typedef double f64;
+
+// Enable water fix.
+#define WATER_FIX
