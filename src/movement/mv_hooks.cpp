@@ -906,6 +906,54 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 			else
 			{
 				utils::TracePlayerBBox(mv->m_vecAbsOrigin, end, bounds, &filter, pm);
+				if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm, bounds, &filter))
+				{
+					has_valid_plane = false;
+					stuck_on_ramp = true;
+					continue;
+				}
+				// We aren't stuck yet, so what if we just ignore whatever we hit just now and keep moving?
+				if (!CloseEnough(pm.fraction, 1.0f, FLT_EPSILON))
+				{
+					bumpcount++;
+					trace_t_s2 pm2;
+					utils::TracePlayerBBox(pm.endpos, end, bounds, &filter, pm2);
+					if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm2, bounds, &filter))
+					{
+						has_valid_plane = false;
+						stuck_on_ramp = true;
+						continue;
+					}
+					if (CloseEnough(pm2.fraction, 1.0f, FLT_EPSILON))
+					{
+						Vector startPos = pm.startpos;
+						pm = pm2;
+						pm.startpos = startPos;
+						break;
+					}
+					// We did hit something, but what if we move the original origin just a tiny bit away from the normal of whatever we just collided?
+					else
+					{
+						Vector newStartPos = mv->m_vecAbsOrigin + pm2.planeNormal * 0.0625f;
+						utils::TracePlayerBBox(newStartPos, end, bounds, &filter, pm2);
+						if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm2, bounds, &filter))
+						{
+							has_valid_plane = false;
+							stuck_on_ramp = true;
+							continue;
+						}
+						if (IsValidMovementTrace(pm2, bounds, &filter) && (pm2.planeNormal != pm.planeNormal || CloseEnough(pm2.fraction, 1.0f, FLT_EPSILON)))
+						{
+							Vector startPos = pm.startpos;
+							pm = pm2;
+							pm.startpos = startPos;
+							if (CloseEnough(pm2.fraction, 1.0f, FLT_EPSILON))
+							{
+								break;
+							}
+						}
+					}
+				}
 #if 0
 				if (player->m_MoveType() == MOVETYPE_WALK &&
 					player->m_hGroundEntity() == nullptr //&& player->GetWaterLevel() < WL_Waist &&
