@@ -317,6 +317,30 @@ internal SCMD_CALLBACK(Command_KzRaytrace)
 	return MRES_SUPERCEDE;
 }
 
+internal SCMD_CALLBACK(Command_KzGetPos)
+{
+	KZPlayer *player = g_pKZPlayerManager->ToPlayer(controller);
+	Vector velocity, origin;
+	QAngle angles;
+	player->GetOrigin(&origin);
+	player->GetAngles(&angles);
+	player->GetVelocity(&velocity);
+	utils::PrintConsole(player->GetController(), "setpos %f %f %f; setang %f %f %f; setvelocity %f %f %f",
+		origin.x, origin.y, origin.z, angles.x, angles.y, angles.z, velocity.x, velocity.y, velocity.z);
+	return MRES_SUPERCEDE;
+}
+
+internal SCMD_CALLBACK(Command_KzSetVel)
+{
+	KZPlayer *player = g_pKZPlayerManager->ToPlayer(controller);
+	Vector velocity;
+	for (int i = 0; i < 3; i++)
+	{
+		velocity[i] = atof((*args)[i + 1]);
+	}
+	player->SetVelocity(velocity);
+	return MRES_SUPERCEDE;
+}
 // TODO: move command registration to the service class?
 void KZ::misc::RegisterCommands()
 {
@@ -332,6 +356,8 @@ void KZ::misc::RegisterCommands()
 	scmd::RegisterCmd("kz_jsalways",   Command_KzJSAlways);
 	scmd::RegisterCmd("kz_respawn",    Command_KzRestart);
 	scmd::RegisterCmd("kz_raytrace",   Command_KzRaytrace);
+	scmd::RegisterCmd("kz_getpos", Command_KzGetPos);
+	scmd::RegisterCmd("setvelocity", Command_KzSetVel);
 	KZ::mode::RegisterCommands();
 }
 
