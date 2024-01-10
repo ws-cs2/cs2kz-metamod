@@ -906,7 +906,58 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 			else
 			{
 				utils::TracePlayerBBox(mv->m_vecAbsOrigin, end, bounds, &filter, pm);
-				utils::DebugLine(pm.startpos, pm.endpos, 255, 0, 0, true, 1.0f);
+				// Check if the collision happens at the corner of the collision box.
+				if (pm.fraction != 1.0f && IsValidMovementTrace(pm, bounds, &filter)
+					&& fabs(pm.planeNormal.z) < 0.8f && fabs(pm.planeNormal.z) < 0.8f && fabs(pm.planeNormal.z) < 0.8f
+					&& fabs(pm.planeNormal.x) > 0.001f && fabs(pm.planeNormal.y) > 0.001f && fabs(pm.planeNormal.z) > 0.001f)
+				{
+					Vector offset, extendedOffset;
+					for (u32 i = 0; i < 3; i++)
+					{
+						offset[i] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] - 0.03125f: bounds.mins[i] + 0.03125f;
+						extendedOffset[i] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] + 0.03125f : bounds.mins[i] - 0.03125f;
+					}
+					bbox_t emptyBounds = { Vector(0,0,0), Vector(0,0,0) };
+					trace_t_s2 cornerpm;
+					utils::TracePlayerBBox(mv->m_vecAbsOrigin + offset, end + offset, emptyBounds, &filter, cornerpm);
+					utils::DebugLine(mv->m_vecAbsOrigin + offset, end + offset, 0, 255, 255, true, 3.0f);
+					f32 retraceFraction = cornerpm.fraction;
+					if (retraceFraction > pm.fraction)
+					{
+						// Trace back from the end to the collision spot just to be sure we did not hit anything else.
+						trace_t_s2 verify;
+						if (CloseEnough(retraceFraction, 1.0f, FLT_EPSILON))
+						{
+							utils::TracePlayerBBox(end, pm.endpos, bounds, &filter, verify);
+							utils::DebugLine(end, pm.endpos, 255, 255, 0, true, 3.0f);
+						}
+						else
+						{
+							utils::TracePlayerBBox(cornerpm.endpos - extendedOffset, pm.endpos, bounds, &filter, verify);
+							utils::DebugLine(cornerpm.endpos - extendedOffset, pm.endpos, 255, 255, 128, true, 3.0f);
+						}
+						// The end positions are so close they might as well be the same spot.
+						bool sameSpot = (pm.endpos - verify.endpos).Length() < 0.2f;
+						if ((player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(verify, bounds, &filter)))
+						{
+							// Somehow we get stuck at the destination. This trace isn't actually real either.
+							has_valid_plane = false;
+							stuck_on_ramp = true;
+							continue;
+						}
+						if (sameSpot)
+						{
+							Vector startPos = pm.startpos;
+							pm = cornerpm;
+							pm.startpos = startPos;
+							pm.endpos = cornerpm.endpos - offset;
+							pm.traceType = 2;
+							pm.fraction = retraceFraction;
+						}
+					}
+				}
+				utils::DebugLine(pm.endpos, pm.endpos + 5 * pm.planeNormal, 255, 0, 0, true, 3.0f);
+				utils::DebugCross3D(pm.endpos, 16, 255, 0, 0, true, 3.0f);
 				if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm, bounds, &filter))
 				{
 					has_valid_plane = false;
@@ -919,12 +970,18 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 					bumpcount++;
 					trace_t_s2 pm2;
 					utils::TracePlayerBBox(pm.endpos, end, bounds, &filter, pm2);
-					utils::DebugLine(pm2.startpos, pm2.endpos, 0, 255, 0, true, 1.0f);
-					if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm2, bounds, &filter))
+					utils::DebugLine(pm2.endpos, pm2.endpos + 8 * pm.planeNormal, 0, 255, 0, true, 10.0f);
+					utils::DebugCross3D(pm2.endpos, 5, 255, 0, 0, true, 3.0f);
+					if (player->m_hGroundEntity() == nullptr && CloseEnough(pm2.fraction, 0.0f, FLT_EPSILON))
 					{
-						has_valid_plane = false;
-						stuck_on_ramp = true;
-						continue;
+						trace_t_s2 stuck;
+						utils::TracePlayerBBox(pm2.endpos, pm2.endpos, bounds, &filter, stuck);
+						if (stuck.startsolid || !CloseEnough(stuck.fraction, 1.0f, FLT_EPSILON))
+						{
+							has_valid_plane = false;
+							stuck_on_ramp = true;
+							continue;
+						}
 					}
 					if (CloseEnough(pm2.fraction, 1.0f, FLT_EPSILON))
 					{
@@ -933,29 +990,31 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 						pm.startpos = startPos;
 						break;
 					}
-					// We did hit something, but what if we move the original origin just a tiny bit away from the normal of whatever we just collided?
-					else
-					{
-						Vector newStartPos = mv->m_vecAbsOrigin + pm2.planeNormal * 0.0625f;
-						utils::TracePlayerBBox(newStartPos, end, bounds, &filter, pm2);
-						utils::DebugLine(pm2.startpos, pm2.endpos, 0, 0, 255, true, 1.0f);
-						if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm2, bounds, &filter))
-						{
-							has_valid_plane = false;
-							stuck_on_ramp = true;
-							continue;
-						}
-						if (IsValidMovementTrace(pm2, bounds, &filter) && (pm2.planeNormal != pm.planeNormal || CloseEnough(pm2.fraction, 1.0f, FLT_EPSILON)))
-						{
-							Vector startPos = pm.startpos;
-							pm = pm2;
-							pm.startpos = startPos;
-							if (CloseEnough(pm2.fraction, 1.0f, FLT_EPSILON))
-							{
-								break;
-							}
-						}
-					}
+					//// We did hit something, but what if we move the original origin just a tiny bit away from the normal of whatever we just collided?
+					//else if (!CloseEnough(pm2.fraction, 0.0f, 0.1f))
+					//{
+					//	Vector newStartPos = mv->m_vecAbsOrigin + pm2.planeNormal * 0.0625f;
+					//	end += pm2.planeNormal * 0.0625f;
+					//	utils::TracePlayerBBox(newStartPos, end, bounds, &filter, pm2);
+					//	utils::DebugLine(pm2.endpos, pm2.endpos + 8 * pm.planeNormal, 0, 0, 255, true, 10.0f);
+					//	utils::DebugCross3D(pm2.endpos, 5, 255, 0, 0, true, 3.0f);
+					//	if (player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(pm2, bounds, &filter))
+					//	{
+					//		has_valid_plane = false;
+					//		stuck_on_ramp = true;
+					//		continue;
+					//	}
+					//	if (IsValidMovementTrace(pm2, bounds, &filter) && (pm2.planeNormal != pm.planeNormal || CloseEnough(pm2.fraction, 1.0f, FLT_EPSILON)))
+					//	{
+					//		Vector startPos = pm.startpos;
+					//		pm = pm2;
+					//		pm.startpos = startPos;
+					//		if (CloseEnough(pm2.fraction, 1.0f, FLT_EPSILON))
+					//		{
+					//			break;
+					//		}
+					//	}
+					//}
 				}
 #if 0
 				if (player->m_MoveType() == MOVETYPE_WALK &&
