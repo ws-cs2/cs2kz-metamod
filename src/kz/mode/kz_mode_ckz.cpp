@@ -527,6 +527,17 @@ void KZClassicModeService::CheckVelocityQuantization()
 	{
 		this->player->currentMoveData->m_vecVelocity.z = this->postProcessMovementZSpeed;
 	}
+	for (u32 i = 0; i < 3; i++)
+	{
+		if (this->player->currentMoveData->m_vecVelocity[i] < this->player->moveDataPost.m_vecVelocity[i]
+		&& this->player->currentMoveData->m_vecVelocity[i] - this->player->moveDataPost.m_vecVelocity[i] < 0.03125f)
+		{
+			if (i != 2 || (i == 2 && fabs(this->player->currentMoveData->m_vecVelocity.z) > 0.03125f))
+			{
+				this->player->currentMoveData->m_vecVelocity[i] = this->player->moveDataPost.m_vecVelocity[i];
+			}
+		}
+	}
 }
 
 // ORIGINAL AUTHORS : Mev & Blacky

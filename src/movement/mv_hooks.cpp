@@ -803,7 +803,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 	Vector vecWallNormal;
 	bool   bWallNormSet = false;
 	
-	float sv_ramp_initial_retrace_length = 0.2f;
+	float sv_ramp_initial_retrace_length = 0.1f;
 
 	for (bumpcount = 0; bumpcount < numbumps; bumpcount++)
 	{
