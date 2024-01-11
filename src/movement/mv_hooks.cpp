@@ -984,8 +984,8 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 							}
 							// First, trace along the line and see if we actually did hit something.
 							bbox_t lineBounds;
-							lineBounds.mins[lineDirection] = bounds.mins[i];
-							lineBounds.maxs[lineDirection] = bounds.maxs[i];
+							lineBounds.mins[lineDirection] = bounds.mins[lineDirection];
+							lineBounds.maxs[lineDirection] = bounds.maxs[lineDirection];
 							
 							trace_t_s2 linepm;
 							utils::TracePlayerBBox(mv->m_vecAbsOrigin + offset, end + offset, lineBounds, &filter, linepm);
