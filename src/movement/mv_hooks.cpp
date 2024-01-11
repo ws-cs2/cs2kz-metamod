@@ -803,7 +803,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 	Vector vecWallNormal;
 	bool   bWallNormSet = false;
 	
-	float sv_ramp_initial_retrace_length = 0.1f;
+	float sv_ramp_initial_retrace_length = 0.2f;
 
 	for (bumpcount = 0; bumpcount < numbumps; bumpcount++)
 	{
@@ -956,51 +956,181 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 				utils::TracePlayerBBox(mv->m_vecAbsOrigin, end, bounds, &filter, pm);
 				// Check if the collision happens at the corner of the collision box.
 				if (pm.fraction != 1.0f && IsValidMovementTrace(pm, bounds, &filter)
-					&& fabs(pm.planeNormal.z) < 0.8f && fabs(pm.planeNormal.z) < 0.8f && fabs(pm.planeNormal.z) < 0.8f
-					&& fabs(pm.planeNormal.x) > 0.001f && fabs(pm.planeNormal.y) > 0.001f && fabs(pm.planeNormal.z) > 0.001f)
+					&& fabs(pm.planeNormal.x) < 0.95f && fabs(pm.planeNormal.y) < 0.95f && fabs(pm.planeNormal.z) < 0.95f)
 				{
-					Vector offset, extendedOffset;
-					for (u32 i = 0; i < 3; i++)
+					u32 retestType = (int)(fabs(pm.planeNormal.x) > 0.001f) + (int)(fabs(pm.planeNormal.y) > 0.001f) + (int)(fabs(pm.planeNormal.z) > 0.001f);
+					switch (retestType)
 					{
-						offset[i] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] - 0.03125f: bounds.mins[i] + 0.03125f;
-						extendedOffset[i] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] + 0.03125f : bounds.mins[i] - 0.03125f;
-					}
-					bbox_t emptyBounds = { Vector(0,0,0), Vector(0,0,0) };
-					trace_t_s2 cornerpm;
-					utils::TracePlayerBBox(mv->m_vecAbsOrigin + offset, end + offset, emptyBounds, &filter, cornerpm);
-					utils::DebugLine(mv->m_vecAbsOrigin + offset, end + offset, 0, 255, 255, true, 3.0f);
-					f32 retraceFraction = cornerpm.fraction;
-					if (retraceFraction > pm.fraction)
-					{
-						// Trace back from the end to the collision spot just to be sure we did not hit anything else.
-						trace_t_s2 verify;
-						if (CloseEnough(retraceFraction, 1.0f, FLT_EPSILON))
+						case 1: // No plane can have a value of 1, so something went really wrong.
 						{
-							utils::TracePlayerBBox(end, pm.endpos, bounds, &filter, verify);
-							utils::DebugLine(end, pm.endpos, 255, 255, 0, true, 3.0f);
+							//Warning("Bogus plane collision detected!");
+							break;
 						}
-						else
+						case 2: // Collision on a player's bbox line.
 						{
-							utils::TracePlayerBBox(cornerpm.endpos - extendedOffset, pm.endpos, bounds, &filter, verify);
-							utils::DebugLine(cornerpm.endpos - extendedOffset, pm.endpos, 255, 255, 128, true, 3.0f);
+							bool badDestination;
+							u32 lineDirection;
+							f32 retraceFraction;
+							Vector offset, extendedOffset;
+							for (u32 i = 0; i < 3; i++)
+							{
+								if (CloseEnough(pm.planeNormal[i], 0.0f, FLT_EPSILON))
+								{
+									lineDirection = i;
+									continue;
+								}
+								offset[i] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] - 0.03125f : bounds.mins[i] + 0.03125f;
+								extendedOffset[i] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] + 0.03125f : bounds.mins[i] - 0.03125f;
+							}
+							// First, trace along the line and see if we actually did hit something.
+							bbox_t lineBounds;
+							lineBounds.mins[lineDirection] = bounds.mins[i];
+							lineBounds.maxs[lineDirection] = bounds.maxs[i];
+							
+							trace_t_s2 linepm;
+							utils::TracePlayerBBox(mv->m_vecAbsOrigin + offset, end + offset, lineBounds, &filter, linepm);
+
+							retraceFraction = linepm.fraction;
+							if (retraceFraction > pm.fraction)
+							{
+								// Trace back from the end to the collision spot just to be sure we did not hit anything else.
+								trace_t_s2 verify;
+								if (CloseEnough(retraceFraction, 1.0f, FLT_EPSILON))
+								{
+									utils::TracePlayerBBox(end, pm.endpos, bounds, &filter, verify);
+								}
+								else
+								{
+									utils::TracePlayerBBox(linepm.endpos - extendedOffset, pm.endpos, bounds, &filter, verify);
+								}
+								// The end positions are so close they might as well be the same spot.
+								bool sameSpot = (pm.endpos - verify.endpos).Length() < 0.2f;
+								if ((player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(verify, bounds, &filter)))
+								{
+									// Somehow we get stuck at the destination. This trace isn't actually real either.
+									badDestination = true;
+								}
+								else if (sameSpot)
+								{
+									Vector startPos = pm.startpos;
+									pm = linepm;
+									pm.startpos = startPos;
+									pm.endpos = linepm.endpos - offset;
+									pm.traceType = 2;
+									pm.fraction = retraceFraction;
+									break;
+								}
+							}
+							// Second, trace from the two corners of the line.
+							// It should be extremely rare that a rampbug happens without either corner touching a ramp. It is most likely not a ramp bug in that case.
+							Vector offsets[2], extendedOffsets[2];
+							for (u32 i = 0; i < 2; i++)
+							{
+								for (u32 j = 0; j < 3; j++)
+								{
+									if (j == lineDirection)
+									{
+										continue;
+									}
+									offsets[i][j] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] - 0.03125f : bounds.mins[i] + 0.03125f;
+									extendedOffsets[i][j] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] + 0.03125f : bounds.mins[i] - 0.03125f;
+								}
+							}
+							offsets[0][lineDirection] = bounds.mins[lineDirection] + 0.03125f;
+							extendedOffsets[0][lineDirection] = bounds.mins[lineDirection] - 0.03125f;
+							offsets[1][lineDirection] = bounds.maxs[lineDirection] + 0.03125f;
+							extendedOffsets[1][lineDirection] = bounds.maxs[lineDirection] - 0.03125f;
+							bbox_t emptyBounds = { Vector(0,0,0), Vector(0,0,0) };
+							trace_t_s2 cornerpm[2];
+							for (u32 i = 0; i < 2; i++)
+							{
+								utils::TracePlayerBBox(mv->m_vecAbsOrigin + offsets[i], end + offsets[i], emptyBounds, &filter, cornerpm[i]);
+							}
+							// Take the shorter trace as our hopefully "real" trace.
+							u32 realTrace = cornerpm[0].fraction < cornerpm[1].fraction ? 0 : 1;
+							retraceFraction = cornerpm[realTrace].fraction;
+							if (retraceFraction > pm.fraction)
+							{
+								// Trace back from the end to the collision spot just to be sure we did not hit anything else.
+								trace_t_s2 verify;
+								if (CloseEnough(retraceFraction, 1.0f, FLT_EPSILON))
+								{
+									utils::TracePlayerBBox(end, pm.endpos, bounds, &filter, verify);
+								}
+								else
+								{
+									utils::TracePlayerBBox(cornerpm[realTrace].endpos - extendedOffsets[realTrace], pm.endpos, bounds, &filter, verify);
+								}
+								// The end positions are so close they might as well be the same spot.
+								bool sameSpot = (pm.endpos - verify.endpos).Length() < 0.2f;
+								if ((player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(verify, bounds, &filter)))
+								{
+									badDestination = true;
+								}
+								if (sameSpot)
+								{
+									Vector startPos = pm.startpos;
+									pm = cornerpm[realTrace];
+									pm.startpos = startPos;
+									pm.endpos = cornerpm[realTrace].endpos - offsets[realTrace];
+									pm.traceType = 2;
+									pm.fraction = retraceFraction;
+								}
+							}
+							if (badDestination)
+							{
+								// Somehow we get stuck at the destination. None of the traces are usable.
+								has_valid_plane = false;
+								stuck_on_ramp = true;
+								continue;
+							}
 						}
-						// The end positions are so close they might as well be the same spot.
-						bool sameSpot = (pm.endpos - verify.endpos).Length() < 0.2f;
-						if ((player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(verify, bounds, &filter)))
+						case 3: // Collision on player's corners.
 						{
-							// Somehow we get stuck at the destination. This trace isn't actually real either.
-							has_valid_plane = false;
-							stuck_on_ramp = true;
-							continue;
-						}
-						if (sameSpot)
-						{
-							Vector startPos = pm.startpos;
-							pm = cornerpm;
-							pm.startpos = startPos;
-							pm.endpos = cornerpm.endpos - offset;
-							pm.traceType = 2;
-							pm.fraction = retraceFraction;
+							Vector offset, extendedOffset;
+							for (u32 i = 0; i < 3; i++)
+							{
+								offset[i] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] - 0.03125f : bounds.mins[i] + 0.03125f;
+								extendedOffset[i] = pm.planeNormal[i] < 0.0f ? bounds.maxs[i] + 0.03125f : bounds.mins[i] - 0.03125f;
+							}
+							bbox_t emptyBounds = { Vector(0,0,0), Vector(0,0,0) };
+							trace_t_s2 cornerpm;
+							utils::TracePlayerBBox(mv->m_vecAbsOrigin + offset, end + offset, emptyBounds, &filter, cornerpm);
+							utils::DebugLine(mv->m_vecAbsOrigin + offset, end + offset, 0, 255, 255, true, 3.0f);
+							f32 retraceFraction = cornerpm.fraction;
+							if (retraceFraction > pm.fraction)
+							{
+								// Trace back from the end to the collision spot just to be sure we did not hit anything else.
+								trace_t_s2 verify;
+								if (CloseEnough(retraceFraction, 1.0f, FLT_EPSILON))
+								{
+									utils::TracePlayerBBox(end, pm.endpos, bounds, &filter, verify);
+									utils::DebugLine(end, pm.endpos, 255, 255, 0, true, 3.0f);
+								}
+								else
+								{
+									utils::TracePlayerBBox(cornerpm.endpos - extendedOffset, pm.endpos, bounds, &filter, verify);
+									utils::DebugLine(cornerpm.endpos - extendedOffset, pm.endpos, 255, 255, 128, true, 3.0f);
+								}
+								// The end positions are so close they might as well be the same spot.
+								bool sameSpot = (pm.endpos - verify.endpos).Length() < 0.2f;
+								if ((player->m_hGroundEntity() == nullptr && !IsValidMovementTrace(verify, bounds, &filter)))
+								{
+									// Somehow we get stuck at the destination. This trace isn't actually real either.
+									has_valid_plane = false;
+									stuck_on_ramp = true;
+									continue;
+								}
+								if (sameSpot)
+								{
+									Vector startPos = pm.startpos;
+									pm = cornerpm;
+									pm.startpos = startPos;
+									pm.endpos = cornerpm.endpos - offset;
+									pm.traceType = 2;
+									pm.fraction = retraceFraction;
+								}
+							}
 						}
 					}
 				}
@@ -1010,6 +1140,11 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 				{
 					has_valid_plane = false;
 					stuck_on_ramp = true;
+					// Fully stuck trace can somehow have startstuck at false, and a plane normal. Revert this nonsense.
+					if (CloseEnough(pm.fraction, 0.0f, FLT_EPSILON))
+					{
+						VectorCopy(vec3_origin, pm.planeNormal);
+					}
 					continue;
 				}
 				// We aren't stuck yet, so what if we just ignore whatever we hit just now and keep moving?
@@ -1028,6 +1163,10 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 						{
 							has_valid_plane = false;
 							stuck_on_ramp = true;
+							if (CloseEnough(pm.fraction, 0.0f, FLT_EPSILON))
+							{
+								VectorCopy(vec3_origin, pm.planeNormal);
+							}
 							continue;
 						}
 					}
