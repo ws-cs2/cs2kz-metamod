@@ -968,9 +968,9 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 						}
 						case 2: // Collision on a player's bbox line.
 						{
-							bool badDestination;
-							u32 lineDirection;
-							f32 retraceFraction;
+							bool badDestination = false;
+							u32 lineDirection = 2;
+							f32 retraceFraction = 0.0f;
 							Vector offset, extendedOffset;
 							for (u32 i = 0; i < 3; i++)
 							{
