@@ -6,15 +6,14 @@
 #include "tier0/memdbgon.h"
 
 #define IGNORE_JUMP_TIME 0.2f
-#define JS_EPSILON 0.03125f
 #define JS_MAX_LADDERJUMP_OFFSET 2.0f
 #define JS_MAX_BHOP_GROUND_TIME 0.05f
 #define JS_MAX_DUCKBUG_RESET_TIME 0.05f
-#define JS_MAX_NOCLIP_RESET_TIME 0.4f
-#define JS_MAX_WEIRDJUMP_FALL_OFFSET (64.0f + JS_EPSILON)
+#define JS_MAX_WEIRDJUMP_FALL_OFFSET 64.0f
 #define JS_TOUCH_GRACE_PERIOD 0.04f
+#define JS_EPSILON 0.03125f
 #define JS_SPEED_MODIFICATION_TOLERANCE 0.1f
-#define JS_TELEPORT_DISTANCE_SQUARED 4096.0f * 4096.0f * ENGINE_FIXED_TICK_INTERVAL
+#define JS_TELEPORT_DISTANCE_SQUARED 4096.0f * 4096.0f / 64.0f
 
 const char *jumpTypeStr[JUMPTYPE_COUNT] =
 {
@@ -64,11 +63,11 @@ f32 AACall::CalcIdealYaw(bool useRadians)
 	f64 accelspeed;
 	if (this->wishspeed != 0)
 	{
-		accelspeed = this->accel * this->wishspeed * this->surfaceFriction * this->subtickFraction * ENGINE_FIXED_TICK_INTERVAL; // Hardcoding tickrate
+		accelspeed = this->accel * this->wishspeed * this->surfaceFriction * this->subtickFraction / 64; // Hardcoding tickrate
 	}
 	else
 	{
-		accelspeed = this->accel * this->maxspeed * this->surfaceFriction * this->subtickFraction * ENGINE_FIXED_TICK_INTERVAL; // Hardcoding tickrate
+		accelspeed = this->accel * this->maxspeed * this->surfaceFriction * this->subtickFraction / 64; // Hardcoding tickrate
 	}
 	if (accelspeed <= 0.0)
 		return useRadians ? M_PI : RAD2DEG(M_PI);
@@ -104,12 +103,12 @@ f32 AACall::CalcMaxYaw(bool useRadians)
 	f32 gamma1, numer, denom;
 	gamma1 = AACall::CalcAccelSpeed(true);
 	f32 speed = this->velocityPre.Length2D();
-	if (gamma1 <= 60)
+	if (gamma1 <= 60) 
 	{
 		numer = -gamma1;
 		denom = 2 * speed;
 	}
-	else
+	else 
 	{
 		numer = -30;
 		denom = speed;
@@ -124,9 +123,9 @@ f32 AACall::CalcAccelSpeed(bool tryMaxSpeed)
 {
 	if (tryMaxSpeed && this->wishspeed == 0)
 	{
-		return this->accel * this->maxspeed * this->surfaceFriction * this->subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
+		return this->accel * this->maxspeed * this->surfaceFriction * this->subtickFraction / 64;
 	}
-	return this->accel * this->wishspeed * this->surfaceFriction * this->subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
+	return this->accel * this->wishspeed * this->surfaceFriction * this->subtickFraction / 64;
 }
 
 f32 AACall::CalcIdealGain()
@@ -158,29 +157,29 @@ void Strafe::End()
 {
 	FOR_EACH_VEC(this->aaCalls, i)
 	{
-		this->duration += this->aaCalls[i].subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
+		this->duration += this->aaCalls[i].subtickFraction / 64;
 		// Calculate BA/DA/OL
 		if (this->aaCalls[i].wishspeed == 0)
 		{
 			u64 buttonBits = IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT;
 			if (utils::IsButtonDown(&this->aaCalls[i].buttons, buttonBits))
 			{
-				this->overlap += this->aaCalls[i].subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
+				this->overlap += this->aaCalls[i].subtickFraction / 64;
 			}
 			else
 			{
-				this->deadAir += this->aaCalls[i].subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
+				this->deadAir += this->aaCalls[i].subtickFraction / 64;
 			}
 		}
 		else if ((this->aaCalls[i].velocityPost - this->aaCalls[i].velocityPre).Length2D() <= JS_EPSILON)
 		{
 			// This gain could just be from quantized float stuff.
-			this->badAngles += this->aaCalls[i].subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
+			this->badAngles += this->aaCalls[i].subtickFraction / 64;
 		}
 		// Calculate sync.
 		else if (this->aaCalls[i].velocityPost.Length2D() - this->aaCalls[i].velocityPre.Length2D() > JS_EPSILON)
 		{
-			this->syncDuration += this->aaCalls[i].subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
+			this->syncDuration += this->aaCalls[i].subtickFraction / 64;
 		}
 
 		// Gain/loss.
@@ -242,7 +241,7 @@ bool Strafe::CalcAngleRatioStats()
 		f32 minYaw = utils::NormalizeDeg(this->aaCalls[i].CalcMinYaw());
 		f32 idealYaw = utils::NormalizeDeg(this->aaCalls[i].CalcIdealYaw());
 		f32 maxYaw = utils::NormalizeDeg(this->aaCalls[i].CalcMaxYaw());
-
+		
 		angles.y = utils::NormalizeDeg(angles.y);
 
 		if (this->turnstate == TURN_RIGHT || /* The ideal angle is calculated for left turns, we need to flip it for right turns. */
@@ -251,7 +250,7 @@ bool Strafe::CalcAngleRatioStats()
 		{
 			angles.y = -angles.y;
 		}
-
+		
 		// It is possible for the player to gain speed here, by pressing the opposite keys 
 		// while still turning in the same direction, which results in actual gain...
 		// Usually this happens at the end of a strafe.
@@ -262,7 +261,7 @@ bool Strafe::CalcAngleRatioStats()
 
 		// If the player yaw is way too off, they are probably pressing the wrong key and probably not turning too fast.
 		// So we shouldn't count them into the average calc.
-
+		
 		//utils::PrintConsoleAll("%f %f %f %f | %f / %f / %f | %f -> %f | %f %f | ws %f wd %f %f %f accel %f fraction %f",
 		//	minYaw, angles.y, idealYaw, maxYaw,
 		//	utils::GetAngleDifference(angles.y, minYaw, 180.0),
@@ -313,10 +312,7 @@ bool Strafe::CalcAngleRatioStats()
 	}
 
 	// This can return nan if the duration is 0, this is intended...
-	if (totalDuration == 0.0f)
-	{
-		return false;
-	}
+	if (totalDuration == 0.0f) return false;
 	ratios.Sort(this->SortFloat);
 	this->arStats.available = true;
 	this->arStats.average = totalRatios / totalDuration;
@@ -363,10 +359,7 @@ void Jump::UpdateAACallPost(Vector wishdir, f32 wishspeed, f32 accel)
 
 void Jump::Update()
 {
-	if (this->AlreadyEnded())
-	{
-		return;
-	}
+	if (this->AlreadyEnded()) return;
 	this->totalDistance += (this->player->currentMoveData->m_vecAbsOrigin - this->player->moveDataPre.m_vecAbsOrigin).Length2D();
 	this->currentMaxSpeed = MAX(this->player->currentMoveData->m_vecVelocity.Length2D(), this->currentMaxSpeed);
 	this->currentMaxHeight = MAX(this->player->currentMoveData->m_vecAbsOrigin.z, this->currentMaxHeight);
@@ -393,8 +386,8 @@ void Jump::End()
 		{
 			if (this->strafes[i].aaCalls[j].ducking)
 			{
-				this->duckDuration += this->strafes[i].aaCalls[j].subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
-				this->duckEndDuration += this->strafes[i].aaCalls[j].subtickFraction * ENGINE_FIXED_TICK_INTERVAL;
+				this->duckDuration += this->strafes[i].aaCalls[j].subtickFraction / 64;
+				this->duckEndDuration += this->strafes[i].aaCalls[j].subtickFraction / 64;
 			}
 			else
 			{
@@ -486,10 +479,7 @@ f32 Jump::GetDistance(bool useDistbugFix, bool disableAddDist)
 {
 	f32 addDist = 32.0f;
 	if (this->jumpType == JumpType_LadderJump || disableAddDist) addDist = 0.0f;
-	if (useDistbugFix)
-	{
-		return (this->adjustedLandingOrigin - this->adjustedTakeoffOrigin).Length2D() + addDist;
-	}
+	if (useDistbugFix) return (this->adjustedLandingOrigin - this->adjustedTakeoffOrigin).Length2D() + addDist;
 	return (this->landingOrigin - this->takeoffOrigin).Length2D() + addDist;
 }
 
@@ -497,10 +487,7 @@ f32 Jump::GetEdge(bool landing) { return 0.0f; } // TODO
 
 f32 Jump::GetAirPath()
 {
-	if (this->totalDistance <= 0.0f)
-	{
-		return 0.0;
-	}
+	if (this->totalDistance <= 0.0f) return 0.0;
 	return this->totalDistance / this->GetDistance(false, true);
 }
 
@@ -508,10 +495,7 @@ f32 Jump::GetDeviation()
 {
 	f32 distanceX = fabs(adjustedLandingOrigin.x - adjustedTakeoffOrigin.x);
 	f32 distanceY = fabs(adjustedLandingOrigin.y - adjustedTakeoffOrigin.y);
-	if (distanceX > distanceY)
-	{
-		return distanceY;
-	}
+	if (distanceX > distanceY) return distanceY;
 	return distanceX;
 }
 
@@ -521,7 +505,7 @@ JumpType KZJumpstatsService::DetermineJumpType()
 	{
 		if (this->player->GetPawn()->m_ignoreLadderJumpTime() > g_pKZUtils->GetServerGlobals()->curtime
 			&& this->player->jumpstatsService->lastJumpButtonTime > this->player->GetPawn()->m_ignoreLadderJumpTime() - IGNORE_JUMP_TIME
-			&& this->player->jumpstatsService->lastJumpButtonTime < this->player->GetPawn()->m_ignoreLadderJumpTime() + ENGINE_FIXED_TICK_INTERVAL)
+			&& this->player->jumpstatsService->lastJumpButtonTime < this->player->GetPawn()->m_ignoreLadderJumpTime() + 1/64)
 		{
 			return JumpType_Invalid;
 		}
@@ -560,10 +544,10 @@ JumpType KZJumpstatsService::DetermineJumpType()
 		{
 			switch (this->jumps.Tail().GetJumpType())
 			{
-				case JumpType_LongJump:return JumpType_Bhop;
-				case JumpType_Bhop:return JumpType_MultiBhop;
-				case JumpType_MultiBhop:return JumpType_MultiBhop;
-				default:return JumpType_Other;
+			case JumpType_LongJump:return JumpType_Bhop;
+			case JumpType_Bhop:return JumpType_MultiBhop;
+			case JumpType_MultiBhop:return JumpType_MultiBhop;
+			default:return JumpType_Other;
 			}
 		}
 		// Check for weird jump
@@ -582,19 +566,6 @@ JumpType KZJumpstatsService::DetermineJumpType()
 	return JumpType_LongJump;
 }
 
-void KZJumpstatsService::Reset()
-{
-	this->jumps.Purge();
-	this->jsAlways = {};
-	this->lastJumpButtonTime = {};
-	this->lastNoclipTime = {};
-	this->lastDuckbugTime = {};
-	this->lastGroundSpeedCappedTime = {};
-	this->lastMovementProcessedTime = {};
-	this->tpmVelocity = Vector(0, 0, 0);
-	this->possibleEdgebug = {};
-}
-
 void KZJumpstatsService::OnProcessMovement()
 {
 	// Always ensure that the player has at least an ongoing jump.
@@ -602,7 +573,7 @@ void KZJumpstatsService::OnProcessMovement()
 	if (this->jumps.Count() == 0)
 	{
 		this->AddJump();
-		this->InvalidateJumpstats("First jump");
+		this->InvalidateJumpstats();
 		return;
 	}
 	this->CheckValidMoveType();
@@ -618,7 +589,7 @@ void KZJumpstatsService::OnChangeMoveType(MoveType_t oldMoveType)
 	else if (oldMoveType == MOVETYPE_WALK && this->player->GetPawn()->m_MoveType() == MOVETYPE_LADDER)
 	{
 		// Not really a valid jump for jumpstats purposes.
-		this->InvalidateJumpstats("Invalid movetype change");
+		this->InvalidateJumpstats();
 		this->EndJump();
 	}
 }
@@ -674,7 +645,6 @@ void KZJumpstatsService::UpdateJump()
 	this->DetectEdgebug();
 	this->DetectInvalidCollisions();
 	this->DetectInvalidGains();
-	this->DetectNoclip();
 }
 
 void KZJumpstatsService::EndJump()
@@ -684,15 +654,9 @@ void KZJumpstatsService::EndJump()
 		Jump *jump = &this->jumps.Tail();
 
 		// Prevent stats being calculated twice.
-		if (jump->AlreadyEnded())
-		{
-			return;
-		}
+		if (jump->AlreadyEnded()) return;
 		jump->End();
-		if (jump->GetJumpType() == JumpType_FullInvalid)
-		{
-			return;
-		}
+		if (jump->GetJumpType() == JumpType_FullInvalid) return;
 		if ((jump->GetOffset() > -JS_EPSILON && jump->IsValid()) || this->jsAlways)
 		{
 			KZJumpstatsService::PrintJumpToChat(this->player, jump);
@@ -704,7 +668,7 @@ void KZJumpstatsService::EndJump()
 void KZJumpstatsService::PrintJumpToChat(KZPlayer *target, Jump *jump)
 {
 	const char *jumpColor = distanceTierColors[jump->GetJumpPlayer()->modeService->GetDistanceTier(jump->GetJumpType(), jump->GetDistance())];
-	utils::CPrintChat(target->GetController(), "%s %s%s{grey}: %s%.1f {grey}| {olive}%i {grey}Strafes | {olive}%.0f%% {grey}Sync | {olive}%.2f {grey}Pre | {olive}%.2f {grey}Max\n\
+	utils::CPrintChat(target->GetController(), "%s %s%s{grey}: %s%.1f {grey}| {olive}%i {grey}Strafes | {olive}%2.f%% {grey}Sync | {olive}%.2f {grey}Pre | {olive}%.2f {grey}Max\n\
 				{grey}BA {olive}%.0f%% {grey}| OL {olive}%.0f%% {grey}| DA {olive}%.0f%% {grey}| {olive}%.1f {grey}Deviation | {olive}%.1f {grey}Width | {olive}%.2f {grey}Height",
 		KZ_CHAT_PREFIX,
 		jumpColor,
@@ -725,16 +689,10 @@ void KZJumpstatsService::PrintJumpToChat(KZPlayer *target, Jump *jump)
 
 void KZJumpstatsService::PrintJumpToConsole(KZPlayer *target, Jump *jump)
 {
-	char invalidateReason[256]{};
-	if (jump->invalidateReason[0] != '\0')
-	{
-		V_snprintf(invalidateReason, sizeof(invalidateReason), "(%s)", jump->invalidateReason);
-	}
-	utils::PrintConsole(target->GetController(), "%s jumped %.4f units with a %s %s",
+	utils::PrintConsole(target->GetController(), "%s jumped %.4f units with a %s",
 		jump->GetJumpPlayer()->GetController()->m_iszPlayerName(),
 		jump->GetDistance(),
-		jumpTypeStr[jump->GetJumpType()],
-		invalidateReason);
+		jumpTypeStr[jump->GetJumpType()]);
 	utils::PrintConsole(target->GetController(), "%s | %i Strafes | %.1f%% Sync | %.2f Pre | %.2f Max | %.0f%% BA | %.0f%% OL | %.0f%% DA | %.2f Height\n%.0f%% GainEff | %.3f Airpath | %.1f Deviation | %.1f Width | %.4f Airtime | %.1f Offset | %.2f/%.2f Crouched",
 		jump->GetJumpPlayer()->modeService->GetModeShortName(),
 		jump->strafes.Count(),
@@ -770,7 +728,7 @@ void KZJumpstatsService::PrintJumpToConsole(KZPlayer *target, Jump *jump)
 		V_snprintf(badAngleString, sizeof(badAngleString), "%.0f%%", jump->strafes[i].GetBadAngleDuration() / jump->strafes[i].GetStrafeDuration() * 100.0f);
 		V_snprintf(overlapString, sizeof(overlapString), "%.0f%%", jump->strafes[i].GetOverlapDuration() / jump->strafes[i].GetStrafeDuration() * 100.0f);
 		V_snprintf(deadAirString, sizeof(deadAirString), "%.0f%%", jump->strafes[i].GetDeadAirDuration() / jump->strafes[i].GetStrafeDuration() * 100.0f);
-		V_snprintf(avgGainString, sizeof(avgGainString), "%.2f", jump->strafes[i].GetGain() / jump->strafes[i].GetStrafeDuration() * ENGINE_FIXED_TICK_INTERVAL);
+		V_snprintf(avgGainString, sizeof(avgGainString), "%.2f", jump->strafes[i].GetGain() / jump->strafes[i].GetStrafeDuration() / 64);
 		V_snprintf(gainEffString, sizeof(gainEffString), "%.0f%%", jump->strafes[i].GetGain() / jump->strafes[i].GetMaxGain() * 100.0f);
 		if (jump->strafes[i].arStats.available)
 		{
@@ -781,7 +739,7 @@ void KZJumpstatsService::PrintJumpToConsole(KZPlayer *target, Jump *jump)
 			V_snprintf(angRatioString, sizeof(angRatioString), "N/A");
 		}
 		utils::PrintConsole(target->GetController(), "%i.%5s %7s%-10s %7s%-10s %-7s %-8s %-4s %-4s %-4s %-7s %-7s %s",
-			i + 1,
+			i,
 			syncString,
 			gainString,
 			externalGainString,
@@ -797,11 +755,11 @@ void KZJumpstatsService::PrintJumpToConsole(KZPlayer *target, Jump *jump)
 			angRatioString);
 	}
 }
-void KZJumpstatsService::InvalidateJumpstats(const char *reason)
+void KZJumpstatsService::InvalidateJumpstats()
 {
 	if (this->jumps.Count() > 0 && !this->jumps.Tail().AlreadyEnded())
 	{
-		this->jumps.Tail().Invalidate(reason);
+		this->jumps.Tail().Invalidate();
 	}
 }
 
@@ -810,11 +768,11 @@ void KZJumpstatsService::TrackJumpstatsVariables()
 	this->lastJumpButtonTime = this->player->GetPawn()->m_ignoreLadderJumpTime();
 	if (this->player->GetPawn()->m_MoveType == MOVETYPE_NOCLIP)
 	{
-		this->lastNoclipTime = g_pKZUtils->GetServerGlobals()->curtime;
+		this->lastNoclipTime = g_pKZUtils->GetServerGlobals()->curtime;	
 	}
 	if (this->player->duckBugged)
 	{
-		this->lastDuckbugTime = g_pKZUtils->GetServerGlobals()->curtime;
+		this->lastDuckbugTime = g_pKZUtils->GetServerGlobals()->curtime;	
 	}
 	if (this->player->walkMoved)
 	{
@@ -834,38 +792,23 @@ void KZJumpstatsService::CheckValidMoveType()
 	// Invalidate jumpstats if movetype is invalid.
 	if (this->player->GetPawn()->m_MoveType() != MOVETYPE_WALK && this->player->GetPawn()->m_MoveType() != MOVETYPE_LADDER)
 	{
-		this->InvalidateJumpstats("Invalid movetype");
-	}
-}
-
-void KZJumpstatsService::DetectNoclip()
-{
-	if (this->lastNoclipTime + JS_MAX_NOCLIP_RESET_TIME > g_pKZUtils->GetServerGlobals()->curtime)
-	{
-		this->InvalidateJumpstats("Just noclipped");
+		this->InvalidateJumpstats();
 	}
 }
 
 void KZJumpstatsService::DetectEdgebug()
 {
-	if (this->jumps.Count() == 0 || !this->jumps.Tail().IsValid())
-	{
-		return;
-	}
+	if (this->jumps.Count() == 0 || !this->jumps.Tail().IsValid()) return;
 	// If the player suddenly gain speed from negative speed, they probably edgebugged.
-	this->possibleEdgebug = false;
-	if (this->tpmVelocity.z < 0.0f && this->player->currentMoveData->m_vecVelocity.z > this->tpmVelocity.z)
+	if (this->player->moveDataPre.m_vecVelocity.z < 0.0f && this->player->currentMoveData->m_vecVelocity.z > this->player->moveDataPre.m_vecVelocity.z)
 	{
-		this->possibleEdgebug = true;
+		this->InvalidateJumpstats();
 	}
 }
 
 void KZJumpstatsService::DetectInvalidCollisions()
 {
-	if (this->jumps.Count() == 0 || !this->jumps.Tail().IsValid())
-	{
-		return;
-	}
+	if (this->jumps.Count() == 0 || !this->jumps.Tail().IsValid()) return;
 	if (this->player->currentMoveData->m_TouchList.Count() > 0)
 	{
 		this->jumps.Tail().touchDuration += g_pKZUtils->GetServerGlobals()->frametime;
@@ -873,7 +816,7 @@ void KZJumpstatsService::DetectInvalidCollisions()
 		// while other collisions do after a certain duration.
 		if (this->jumps.Tail().touchDuration > JS_TOUCH_GRACE_PERIOD)
 		{
-			this->InvalidateJumpstats("Invalid collisions");
+			this->InvalidateJumpstats();
 		}
 		if (this->player->moveDataPre.m_vecVelocity.z > 0.0f)
 		{
@@ -894,7 +837,7 @@ void KZJumpstatsService::DetectInvalidGains()
 
 	if (actualSpeed - speed > JS_SPEED_MODIFICATION_TOLERANCE && actualSpeed > JS_EPSILON)
 	{
-		this->InvalidateJumpstats("Invalid gains");
+		this->InvalidateJumpstats();
 	}
 }
 
@@ -902,31 +845,17 @@ void KZJumpstatsService::DetectExternalModifications()
 {
 	if ((this->player->currentMoveData->m_vecAbsOrigin - this->player->moveDataPost.m_vecAbsOrigin).LengthSqr() > JS_TELEPORT_DISTANCE_SQUARED)
 	{
-		this->InvalidateJumpstats("Externally modified");
+		this->InvalidateJumpstats();
 	}
 }
 
 void KZJumpstatsService::OnTryPlayerMove()
 {
-	this->tpmVelocity = this->player->currentMoveData->m_vecVelocity;
+	this->tpmPreSpeed = this->player->currentMoveData->m_vecVelocity.Length2D();
 }
 
 void KZJumpstatsService::OnTryPlayerMovePost()
 {
-	if (this->jumps.Count() == 0 || this->jumps.Tail().strafes.Count() == 0)
-	{
-		return;
-	}
-	this->jumps.Tail().strafes.Tail().UpdateCollisionVelocityChange(this->player->currentMoveData->m_vecVelocity.Length2D() - this->tpmVelocity.Length2D());
-	this->DetectEdgebug();
-}
-
-void KZJumpstatsService::OnProcessMovementPost()
-{
-	if (this->possibleEdgebug && !(this->player->GetPawn()->m_fFlags() & FL_ONGROUND))
-	{
-		this->InvalidateJumpstats("Edgebugged");
-		this->possibleEdgebug = false;
-	}
-	this->TrackJumpstatsVariables();
+	if (this->jumps.Count() == 0 || this->jumps.Tail().strafes.Count() == 0) return;
+	this->jumps.Tail().strafes.Tail().UpdateCollisionVelocityChange(this->player->currentMoveData->m_vecVelocity.Length2D() - this->tpmPreSpeed);
 }

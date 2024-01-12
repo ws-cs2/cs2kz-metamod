@@ -34,7 +34,6 @@ void KZPlayer::Reset()
 	// TODO: reset every service.
 	this->checkpointService->Reset();
 	this->quietService->Reset();
-	this->jumpstatsService->Reset();
 	// TODO: Make a cvar for default mode
 	g_pKZModeManager->SwitchToMode(this, "VNL", true);
 }
@@ -72,7 +71,7 @@ void KZPlayer::OnProcessMovementPost()
 	this->jumpstatsService->UpdateJump();
 	MovementPlayer::OnProcessMovementPost();
 	this->modeService->OnProcessMovementPost();
-	this->jumpstatsService->OnProcessMovementPost();
+	this->jumpstatsService->TrackJumpstatsVariables();
 }
 
 void KZPlayer::OnPlayerMove()
@@ -121,14 +120,6 @@ void KZPlayer::OnCheckWater()
 {
 	this->modeService->OnCheckWater();
 }
-void KZPlayer::OnWaterMove()
-{
-	this->modeService->OnWaterMove();
-}
-void KZPlayer::OnWaterMovePost()
-{
-	this->modeService->OnWaterMovePost();
-}
 void KZPlayer::OnCheckWaterPost()
 {
 	this->modeService->OnCheckWaterPost();
@@ -149,9 +140,9 @@ void KZPlayer::OnDuckPost()
 {
 	this->modeService->OnDuckPost();
 }
-int KZPlayer::OnCanUnduck()
+void KZPlayer::OnCanUnduck()
 {
-	return this->modeService->OnCanUnduck();
+	this->modeService->OnCanUnduck();
 }
 void KZPlayer::OnCanUnduckPost()
 {
@@ -279,16 +270,13 @@ void KZPlayer::OnChangeMoveType(MoveType_t oldMoveType)
 
 void KZPlayer::OnTeleport(const Vector *origin, const QAngle *angles, const Vector *velocity)
 {
-	this->jumpstatsService->InvalidateJumpstats("Teleported");
+	this->jumpstatsService->InvalidateJumpstats();
 }
 
 void KZPlayer::EnableGodMode()
 {
 	CCSPlayerPawn *pawn = this->GetPawn();
-	if (!pawn)
-	{
-		return;	
-	}
+	if (!pawn) return;
 	if (pawn->m_bTakesDamage())
 	{
 		pawn->m_bTakesDamage(false);
@@ -298,10 +286,7 @@ void KZPlayer::EnableGodMode()
 void KZPlayer::HandleMoveCollision()
 {
 	CCSPlayerPawn *pawn = this->GetPawn();
-	if (!pawn)
-	{
-		return;
-	}
+	if (!pawn) return;
 	if (pawn->m_lifeState() != LIFE_ALIVE)
 	{
 		DisableNoclip();
@@ -365,11 +350,11 @@ void KZPlayer::EndZoneStartTouch()
 			snprintf(tpCount, sizeof(tpCount), " (%i teleports)", this->checkpointService->tpCount);
 		}
 		utils::CPrintChatAll("%s %s finished the map with a %s run of %s!%s",
-			KZ_CHAT_PREFIX,
-			controller->m_iszPlayerName(),
-			this->checkpointService->tpCount ? "TP" : "PRO",
-			time,
-			tpCount);
+							 KZ_CHAT_PREFIX,
+							 controller->m_iszPlayerName(),
+							 this->checkpointService->tpCount ? "TP" : "PRO",
+							 time,
+							 tpCount);
 	}
 	MovementPlayer::EndZoneStartTouch();
 }
@@ -377,10 +362,8 @@ void KZPlayer::EndZoneStartTouch()
 void KZPlayer::UpdatePlayerModelAlpha()
 {
 	CCSPlayerPawn *pawn = this->GetPawn();
-	if (!pawn)
-	{
-		return;
-	}
+	if (!pawn) return;
+	
 	Color ogColor = pawn->m_clrRender();
 	if (this->hideLegs && pawn->m_clrRender().a() == 255)
 	{

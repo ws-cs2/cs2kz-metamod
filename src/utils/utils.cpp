@@ -30,7 +30,6 @@ FindEntityByClassname_t *FindEntityByClassnameFunc = NULL;
 DebugLine_t *utils::DebugLine = NULL;
 DebugCross3D_t *utils::DebugCross3D = NULL;
 
-
 void modules::Initialize()
 {
 	modules::engine = new CModule(ROOTBIN, "engine2");
@@ -69,7 +68,7 @@ bool utils::Initialize(ISmmAPI *ismm, char *error, size_t maxlen)
 
 	utils::UnlockConVars();
 	utils::UnlockConCommands();
-
+	
 
 	RESOLVE_SIG(modules::server, sigs::NetworkStateChanged, schema::NetworkStateChanged);
 	RESOLVE_SIG(modules::server, sigs::StateChanged, schema::StateChanged);
@@ -83,7 +82,7 @@ bool utils::Initialize(ISmmAPI *ismm, char *error, size_t maxlen)
 	RESOLVE_SIG(modules::server, sigs::FindEntityByClassname, FindEntityByClassnameFunc);
 	RESOLVE_SIG(modules::server, sigs::DebugLine, DebugLine);
 	RESOLVE_SIG(modules::server, sigs::DebugCross3D, DebugCross3D);
-
+	
 	InitDetours();
 	return true;
 }
@@ -95,10 +94,7 @@ void utils::Cleanup()
 
 CBaseEntity2 *utils::FindEntityByClassname(CEntityInstance *start, const char *name)
 {
-	if (!g_pEntitySystem)
-	{
-		return NULL;
-	}
+	if (!g_pEntitySystem) return NULL;
 	return FindEntityByClassnameFunc(g_pEntitySystem, start, name);
 }
 
@@ -183,7 +179,7 @@ CBasePlayerController *utils::GetController(CBaseEntity2 *entity)
 	}
 	else if (entity->IsController())
 	{
-		return static_cast<CBasePlayerController *>(entity);
+		return static_cast<CBasePlayerController*>(entity);
 	}
 	else
 	{
@@ -233,10 +229,7 @@ bool utils::IsButtonDown(CInButtonState *buttons, u64 button, bool onlyDown)
 					}
 					key++;
 					currentButton >>= 1;
-					if (!currentButton)
-					{
-						return !!(buttons->m_pButtonStates[0] & button);
-					}
+					if (!currentButton) return !!(buttons->m_pButtonStates[0] & button);
 				}
 			}
 			return false;
@@ -265,7 +258,8 @@ CPlayerSlot utils::GetEntityPlayerSlot(CBaseEntity2 *entity)
 
 i32 utils::FormatTimerText(i32 ticks, char *buffer, i32 bufferSize)
 {
-	f64 time = ticks * ENGINE_FIXED_TICK_INTERVAL;
+	// TODO: add a constant for tick interval
+	f64 time = ticks * 0.015625;
 	i32 milliseconds = (i32)(time * 1000.0) % 1000;
 	i32 seconds = ((i32)time) % 60;
 	i32 minutes = (i32)(time / 60.0) % 60;
@@ -304,11 +298,9 @@ f32 utils::NormalizeDeg(f32 a)
 	return a;
 }
 
-f32 utils::GetAngleDifference(const f32 source, const f32 target, const f32 c, bool relative)
+f32 utils::GetAngleDifference(const f32 x, const f32 y, const f32 c)
 {
-	if (relative)
-		return fmod((fmod(target - source, 2 * c) + 3 * c), 2 * c) - c;
-	return fmod(fabs(target - source) + c, 2 * c) - c;
+	return fmod(fabs(x - y) + c, 2 * c) - c;
 }
 
 void utils::SendConVarValue(CPlayerSlot slot, ConVar *conVar, const char *value)

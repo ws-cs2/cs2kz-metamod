@@ -6,7 +6,6 @@
 #include "igameevents.h"
 #include "igameeventsystem.h"
 #include "utils/datatypes.h"
-#include <iserver.h>
 
 namespace interfaces
 {
@@ -49,7 +48,8 @@ public:
 	virtual f32 NormalizeDeg(f32 a);
 	// Gets the difference in angle between 2 angles. 
 	// c can be PI (for radians) or 180.0 (for degrees);
-	virtual f32 GetAngleDifference(const f32 source, const f32 target, const f32 c, bool relative = false);
+	virtual f32 GetAngleDifference(const f32 x, const f32 y, const f32 c);
+
 };
 
 extern KZUtils *g_pKZUtils;

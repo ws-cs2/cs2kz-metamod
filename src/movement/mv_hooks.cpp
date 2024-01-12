@@ -20,10 +20,8 @@ void movement::InitDetours()
 	INIT_DETOUR(FullWalkMove);
 	INIT_DETOUR(MoveInit);
 	INIT_DETOUR(CheckWater);
-	INIT_DETOUR(WaterMove);
 	INIT_DETOUR(CheckVelocity);
 	INIT_DETOUR(Duck);
-	INIT_DETOUR(CanUnduck);
 	INIT_DETOUR(LadderMove);
 	INIT_DETOUR(CheckJumpButton);
 	INIT_DETOUR(OnJump);
@@ -42,11 +40,8 @@ f32 FASTCALL movement::Detour_GetMaxSpeed(CCSPlayerPawn *pawn)
 {
 	MovementPlayer *player = g_pPlayerManager->ToPlayer(pawn);
 	f32 newMaxSpeed = player->GetPlayerMaxSpeed();
-
-	if (newMaxSpeed <= 0.0f)
-	{
-		return GetMaxSpeed(pawn);
-	}
+	
+	if (newMaxSpeed <= 0.0f) return GetMaxSpeed(pawn);
 	return newMaxSpeed;
 }
 
@@ -119,27 +114,7 @@ bool FASTCALL movement::Detour_CheckWater(CCSPlayer_MovementServices *ms, CMoveD
 	player->OnCheckWater();
 	auto retValue = CheckWater(ms, mv);
 	player->OnCheckWaterPost();
-#ifdef WATER_FIX
-	if (player->enableWaterFixThisTick)
-	{
-		return player->GetPawn()->m_flWaterLevel() > 0.5f;
-	}
-#endif
 	return retValue;
-}
-
-void FASTCALL movement::Detour_WaterMove(CCSPlayer_MovementServices *ms, CMoveData *mv)
-{
-	MovementPlayer *player = g_pPlayerManager->ToPlayer(ms);
-	player->OnWaterMove();
-#ifdef WATER_FIX
-	if (player->enableWaterFixThisTick)
-	{
-		player->ignoreNextCategorizePosition = true;
-	}
-#endif
-	WaterMove(ms, mv);
-	player->OnWaterMovePost();
 }
 
 void FASTCALL movement::Detour_CheckVelocity(CCSPlayer_MovementServices *ms, CMoveData *mv, const char *a3)
@@ -158,19 +133,6 @@ void FASTCALL movement::Detour_Duck(CCSPlayer_MovementServices *ms, CMoveData *m
 	Duck(ms, mv);
 	player->processingDuck = false;
 	player->OnDuckPost();
-}
-
-bool FASTCALL movement::Detour_CanUnduck(CCSPlayer_MovementServices *ms, CMoveData *mv)
-{
-	MovementPlayer *player = g_pPlayerManager->ToPlayer(ms);
-	int overrideValue = player->OnCanUnduck();
-	bool canUnduck = CanUnduck(ms, mv);
-	if (overrideValue != -1)
-	{
-		canUnduck = !!overrideValue;
-	}
-	player->OnCanUnduckPost();
-	return canUnduck;
 }
 
 bool FASTCALL movement::Detour_LadderMove(CCSPlayer_MovementServices *ms, CMoveData *mv)
@@ -219,16 +181,6 @@ bool FASTCALL movement::Detour_LadderMove(CCSPlayer_MovementServices *ms, CMoveD
 void FASTCALL movement::Detour_CheckJumpButton(CCSPlayer_MovementServices *ms, CMoveData *mv)
 {
 	MovementPlayer *player = g_pPlayerManager->ToPlayer(ms);
-#ifdef WATER_FIX
-	if (player->enableWaterFixThisTick && ms->pawn->m_MoveType() == MOVETYPE_WALK && ms->pawn->m_flWaterLevel() > 0.5f)
-	{
-		if (ms->m_nButtons()->m_pButtonStates[0] & IN_JUMP)
-		{
-			ms->m_nButtons()->m_pButtonStates[1] |= IN_JUMP;
-		}
-		movement::Detour_Duck(ms, mv);
-	}
-#endif
 	player->OnCheckJumpButton();
 	CheckJumpButton(ms, mv);
 	player->OnCheckJumpButtonPost();
@@ -305,7 +257,7 @@ void TracePlayerBBox_Custom(const Vector &start, const Vector &end, const bbox_t
 	
 	f32 dotA = direction.Dot(pm.planeNormal);
 	
-	CGlobalVars *gpGlobals = g_pKZUtils->GetServerGlobals();
+	gpGlobals = g_pKZUtils->GetServerGlobals();
 	if (pm.fraction < 1 && dotA < 0 && gpGlobals->curtime - g_clipVelocityDisableTime >= CLIPVELOCITY_TIME)
 	{
 #if 1
@@ -794,7 +746,7 @@ internal void TryPlayerMove_Custom(CCSPlayer_MovementServices *ms, CMoveData *mv
 	bounds.maxs = { 16, 16, 72 };
 	
 	allFraction = 0;
-	CGlobalVars *gpGlobals = g_pKZUtils->GetServerGlobals();
+	gpGlobals = g_pKZUtils->GetServerGlobals();
 	time_left = gpGlobals->frametime; // Total time for this movement operation.
 
 	new_velocity.Init();
@@ -1478,17 +1430,10 @@ void FASTCALL movement::Detour_TryPlayerMove(CCSPlayer_MovementServices *ms, CMo
 void FASTCALL movement::Detour_CategorizePosition(CCSPlayer_MovementServices *ms, CMoveData *mv, bool bStayOnGround)
 {
 	MovementPlayer *player = g_pPlayerManager->ToPlayer(ms);
-#ifdef WATER_FIX
-	if (player->enableWaterFixThisTick && player->ignoreNextCategorizePosition)
-	{
-		player->ignoreNextCategorizePosition = false;
-		return;
-	}
-#endif
 	player->OnCategorizePosition(bStayOnGround);
 	Vector oldVelocity = mv->m_vecVelocity;
 	bool oldOnGround = !!(player->GetPawn()->m_fFlags() & FL_ONGROUND);
-
+	
 	CategorizePosition(ms, mv, bStayOnGround);
 
 	bool ground = !!(player->GetPawn()->m_fFlags() & FL_ONGROUND);

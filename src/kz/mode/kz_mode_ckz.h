@@ -41,7 +41,7 @@ class KZClassicModeService : public KZModeService
 	const char *modeCvarValues[KZ::mode::numCvar] =
 	{
 		"1",				// mv_rampbug_fix
-		"false",			// slope_drop_enable
+		"true",				// slope_drop_enable
 		"6.5",				// sv_accelerate
 		"false",			// sv_accelerate_use_weapon_speed
 		"100",				// sv_airaccelerate
@@ -75,20 +75,7 @@ class KZClassicModeService : public KZModeService
 	f32 lastDesiredViewAngleTime{};
 	QAngle lastDesiredViewAngle;
 	f32 lastJumpReleaseTime{};
-	bool oldDuckPressed{};
-	bool forcedUnduck{};
-	f32 postProcessMovementZSpeed{};
-	struct AngleHistory
-	{
-		f32 rate;
-		f32 when;
-		f32 duration;
-	};
-	CUtlVector<AngleHistory> angleHistory;
-	f32 leftPreRatio{};
-	f32 rightPreRatio{};
-	f32 bonusSpeed{};
-	f32 maxPre{};
+
 public:
 	virtual const char *GetModeName() override;
 	virtual const char *GetModeShortName() override;
@@ -97,41 +84,15 @@ public:
 	virtual f32 GetPlayerMaxSpeed() override;
 
 	virtual void OnProcessUsercmds(void *, int) override;
-	virtual void OnProcessMovement() override;
-	virtual void OnProcessMovementPost() override;
+	virtual void OnPlayerMove() override;
 	virtual void OnJump() override;
 	virtual void OnJumpPost() override;
-	virtual void OnStartTouchGround() override;
+	virtual void OnPostPlayerMovePost() override;
 	virtual void OnStopTouchGround() override;
 
 	// Insert subtick timing to be called later.
 	// This is called either at the end of movement processing, or at the start of ProcessUsercmds.
 	// If it is called at the end of movement processing, it must set subtick timing into the future.
 	// If it is called at the start of ProcessUsercmds, it must set subtick timing in the past.
-	void InsertSubtickTiming(float time, bool future);
-
-	void InterpolateViewAngles();
-	void RestoreInterpolatedViewAngles();
-
-	void UpdateAngleHistory();
-	void CalcPrestrafe();
-	f32 GetPrestrafeGain();
-
-	void CheckVelocityQuantization();
-	void RemoveCrouchJumpBind();
-	/*
-		Ported from DanZay's SimpleKZ:
-		Duck speed is reduced by the game upon ducking or unducking.
-		The goal here is to accept that duck speed is reduced, but
-		stop it from being reduced further when spamming duck.
-
-		This is done by enforcing a minimum duck speed equivalent to
-		the value as if the player only ducked once. When not in not
-		in the middle of ducking, duck speed is reset to its normal
-		value in effort to reduce the number of times the minimum
-		duck speed is enforced. This should reduce noticeable lag.
-	*/
-	void ReduceDuckSlowdown();
-	
-	void SlopeFix();
+	void InsertSubtickTiming(KZPlayer *player, float time, bool future);
 };

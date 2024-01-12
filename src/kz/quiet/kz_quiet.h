@@ -14,15 +14,13 @@ namespace KZ::quiet
 class KZQuietService : public KZBaseService
 {
 	using KZBaseService::KZBaseService;
-	u8 lastObserverMode;
-	CHandle< CBaseEntity2 > lastObserverTarget;
 public:
 	bool hideOtherPlayers{};
+	
 	virtual void Reset() override;
 
-	void ToggleHide();
-	void UpdateHideState();
-	void SendFullUpdate();
+	void ToggleHide() { this->hideOtherPlayers = !this->hideOtherPlayers; };
+
 	bool ShouldHide();
 	bool ShouldHideIndex(u32 targetIndex);
 };
